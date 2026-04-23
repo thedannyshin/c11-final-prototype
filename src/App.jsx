@@ -937,54 +937,118 @@ function AquariumCanvas({ strokes }) {
 // ---------------------------------------------------------------------------
 function DrawingPad({ onCommit }) {
   const canvasRef = useRef(null);
-  const draftRef = useRef([]); // current in-progress stroke
-  const submittedRef = useRef([]); // all completed strokes on this pad
+  // Offscreen canvas holds all committed strokes — never redrawn during a live stroke.
+  const committedCanvasRef = useRef(null);
+  const draftRef = useRef([]);
+  const submittedRef = useRef([]);
   const drawingRef = useRef(false);
+  const rafRef = useRef(null);
+  const colorRef = useRef(DEFAULT_COLOR);
+  const sizeRef = useRef(4);
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [size, setSize] = useState(4);
   const [strokeCount, setStrokeCount] = useState(0);
 
-  const redrawCanvas = () => {
-    const canvas = canvasRef.current;
+  // Keep refs in sync so RAF callbacks always read the latest values.
+  useEffect(() => { colorRef.current = color; }, [color]);
+  useEffect(() => { sizeRef.current = size; }, [size]);
+
+  const getCanvas = () => canvasRef.current;
+  const getDpr = () => window.devicePixelRatio || 1;
+
+  // Initialise both canvases to the correct physical pixel size.
+  const initCanvases = () => {
+    const canvas = getCanvas();
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const dpr = getDpr();
+    const rect = canvas.getBoundingClientRect();
+    const W = Math.round(rect.width * dpr);
+    const H = Math.round(rect.height * dpr);
+    if (canvas.width !== W || canvas.height !== H) {
+      canvas.width = W;
+      canvas.height = H;
+    }
+    if (!committedCanvasRef.current) {
+      committedCanvasRef.current = document.createElement('canvas');
+    }
+    const oc = committedCanvasRef.current;
+    if (oc.width !== W || oc.height !== H) {
+      oc.width = W;
+      oc.height = H;
+      rebakeCommitted();
+    }
+  };
+
+  // Redraw all completed strokes onto the offscreen canvas.
+  const rebakeCommitted = () => {
+    const oc = committedCanvasRef.current;
+    if (!oc) return;
+    const ctx = oc.getContext('2d');
+    const dpr = getDpr();
+    ctx.clearRect(0, 0, oc.width, oc.height);
     ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    const W = canvas.width;
-    const H = canvas.height;
-
-    // Draw all submitted strokes.
+    ctx.fillRect(0, 0, oc.width, oc.height);
     for (const path of submittedRef.current) {
       ctx.save();
       drawPath(
         ctx,
-        path.points.map((p) => ({ x: p.x * W, y: p.y * H })),
+        path.points.map((p) => ({ x: p.x * oc.width, y: p.y * oc.height })),
         path.color,
-        path.size
-      );
-      ctx.restore();
-    }
-
-    // Draw the current draft stroke.
-    if (draftRef.current.length > 1) {
-      ctx.save();
-      drawPath(
-        ctx,
-        draftRef.current.map((p) => ({ x: p.x * W, y: p.y * H })),
-        color,
-        size
+        path.size * dpr,
       );
       ctx.restore();
     }
   };
 
-  useEffect(() => { redrawCanvas(); }, []);
-  useEffect(() => { redrawCanvas(); }, [color, size]);
+  // Composite: blit committed layer + draw the live draft segment on top.
+  const renderFrame = () => {
+    rafRef.current = null;
+    const canvas = getCanvas();
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = getDpr();
+    const W = canvas.width;
+    const H = canvas.height;
+
+    if (committedCanvasRef.current) {
+      ctx.drawImage(committedCanvasRef.current, 0, 0);
+    } else {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    const draft = draftRef.current;
+    if (draft.length > 1) {
+      ctx.save();
+      drawPath(
+        ctx,
+        draft.map((p) => ({ x: p.x * W, y: p.y * H })),
+        colorRef.current,
+        sizeRef.current * dpr,
+      );
+      ctx.restore();
+    }
+  };
+
+  const scheduleRender = () => {
+    if (!rafRef.current) rafRef.current = requestAnimationFrame(renderFrame);
+  };
+
+  useEffect(() => {
+    initCanvases();
+    rebakeCommitted();
+    scheduleRender();
+    const onResize = () => { initCanvases(); rebakeCommitted(); scheduleRender(); };
+    window.addEventListener('resize', onResize);
+    return () => { window.removeEventListener('resize', onResize); cancelAnimationFrame(rafRef.current); };
+  }, []);
+
+  // Rebake when color/size changes (clears old draft preview).
+  useEffect(() => { rebakeCommitted(); scheduleRender(); }, [color, size]);
 
   const getPoint = (event) => {
-    const rect = canvasRef.current.getBoundingClientRect();
+    const canvas = getCanvas();
+    const rect = canvas.getBoundingClientRect();
     const touch = event.touches?.[0] || event.changedTouches?.[0];
     const clientX = touch ? touch.clientX : event.clientX;
     const clientY = touch ? touch.clientY : event.clientY;
@@ -993,53 +1057,50 @@ function DrawingPad({ onCommit }) {
 
   const start = (event) => {
     event.preventDefault();
+    initCanvases();
     drawingRef.current = true;
     draftRef.current = [getPoint(event)];
-    redrawCanvas();
+    scheduleRender();
   };
 
   const move = (event) => {
     if (!drawingRef.current) return;
     event.preventDefault();
     draftRef.current.push(getPoint(event));
-    redrawCanvas();
+    scheduleRender();
   };
 
-  // On finger-up, auto-commit the draft stroke to the local pad buffer.
   const end = (event) => {
     if (!drawingRef.current) return;
     event.preventDefault();
     drawingRef.current = false;
     if (draftRef.current.length > 1) {
-      submittedRef.current = [
-        ...submittedRef.current,
-        { color, size, points: [...draftRef.current] },
-      ];
+      submittedRef.current = [...submittedRef.current, { color: colorRef.current, size: sizeRef.current, points: [...draftRef.current] }];
       setStrokeCount((c) => c + 1);
     }
     draftRef.current = [];
-    redrawCanvas();
+    rebakeCommitted();
+    scheduleRender();
   };
 
-  // Bundle everything into one character and broadcast.
   const sendToScreen = () => {
     const allPaths = [...submittedRef.current];
-    if (draftRef.current.length > 1) {
-      allPaths.push({ color, size, points: [...draftRef.current] });
-    }
+    if (draftRef.current.length > 1) allPaths.push({ color: colorRef.current, size: sizeRef.current, points: [...draftRef.current] });
     if (allPaths.length === 0) return;
     onCommit({ id: crypto.randomUUID(), paths: allPaths });
     submittedRef.current = [];
     draftRef.current = [];
     setStrokeCount(0);
-    redrawCanvas();
+    rebakeCommitted();
+    scheduleRender();
   };
 
   const clearPad = () => {
     submittedRef.current = [];
     draftRef.current = [];
     setStrokeCount(0);
-    redrawCanvas();
+    rebakeCommitted();
+    scheduleRender();
   };
 
   return (
@@ -1068,8 +1129,6 @@ function DrawingPad({ onCommit }) {
       <div className="pad-frame">
         <canvas
           ref={canvasRef}
-          width={600}
-          height={700}
           className="drawing-pad"
           onMouseDown={start}
           onMouseMove={move}
