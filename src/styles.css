@@ -409,15 +409,17 @@ p {
 
 .fingertip-cursor {
   position: fixed;
+  top: 0;
+  left: 0;
   width: 22px;
   height: 22px;
   border-radius: 50%;
   background: rgba(0, 212, 255, 0.25);
   border: 2px solid rgba(0, 212, 255, 0.85);
   box-shadow: 0 0 16px rgba(0, 212, 255, 0.55), 0 0 32px rgba(0, 212, 255, 0.25);
-  transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 200;
+  will-change: transform;
   transition: width 0.08s, height 0.08s, background 0.08s, box-shadow 0.08s;
 }
 

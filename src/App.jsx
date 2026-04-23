@@ -215,10 +215,15 @@ function useHandTracking(enabled) {
           minDetectionConfidence: 0.6,
           minTrackingConfidence: 0.5,
         });
+        const smoothRef = { x: null, y: null };
+        const SMOOTH = 0.5; // lerp factor: lower = smoother but laggier
+
         hands.onResults((results) => {
           if (!active) return;
           if (!results.multiHandLandmarks?.length) {
             setFingertipPos(null);
+            smoothRef.x = null;
+            smoothRef.y = null;
             if (prevPinchRef.current) {
               prevPinchRef.current = false;
               pinchCbRef.current.onEnd?.(null);
@@ -229,8 +234,13 @@ function useHandTracking(enabled) {
           const tip = lm[8];   // index fingertip
           const thumb = lm[4]; // thumb tip
           // Mirror x so it matches the user's perspective
-          const sx = (1 - tip.x) * window.innerWidth;
-          const sy = tip.y * window.innerHeight;
+          const rawX = (1 - tip.x) * window.innerWidth;
+          const rawY = tip.y * window.innerHeight;
+          // Exponential smoothing to reduce jitter
+          if (smoothRef.x === null) { smoothRef.x = rawX; smoothRef.y = rawY; }
+          else { smoothRef.x += (rawX - smoothRef.x) * SMOOTH; smoothRef.y += (rawY - smoothRef.y) * SMOOTH; }
+          const sx = smoothRef.x;
+          const sy = smoothRef.y;
           setFingertipPos({ x: sx, y: sy });
 
           const dx = (tip.x - thumb.x) * window.innerWidth;
@@ -1480,7 +1490,7 @@ function HostView({ room, shared, onResetRoom }) {
       {fingertipPos && handEnabled && (
         <div
           className={`fingertip-cursor${heldCreature ? ' is-grabbing' : ''}`}
-          style={{ left: fingertipPos.x, top: fingertipPos.y }}
+          style={{ transform: `translate(calc(${fingertipPos.x}px - 50%), calc(${fingertipPos.y}px - 50%))` }}
         />
       )}
     </div>
