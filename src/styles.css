@@ -450,17 +450,19 @@ p {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  width: 100%;
 }
 
 .swatches-inline {
   display: flex;
   gap: 5px;
-  flex-shrink: 0;
+  flex: 1;
+  justify-content: space-between;
 }
 
 .swatch-sm {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1.5px solid rgba(255,255,255,0.15);
   flex-shrink: 0;
@@ -473,9 +475,7 @@ p {
 }
 
 .size-slider {
-  flex: 1;
-  min-width: 0;
-  accent-color: rgba(255,255,255,0.6);
+  display: none;
 }
 
 .pad-actions {
@@ -485,7 +485,7 @@ p {
 }
 
 .pad-actions .button {
-  padding: 8px 12px;
+  padding: 8px 16px;
   min-height: 36px;
   font-size: 0.875rem;
   border-radius: 12px;
