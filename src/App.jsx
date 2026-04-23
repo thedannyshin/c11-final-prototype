@@ -811,6 +811,8 @@ function AquariumCanvas({ strokes, heldIdRef = null, heldPosRef = null, position
   }, []);
 
   // Sync incoming strokes → animated character entries.
+  // Also removes creatures that have been taken out of strokes (e.g. dragged
+  // to the side panel) so they don't linger in the animation loop.
   useEffect(() => {
     if (strokes.length === 0) {
       charactersRef.current = [];
@@ -819,6 +821,9 @@ function AquariumCanvas({ strokes, heldIdRef = null, heldPosRef = null, position
       knownIdsRef.current.clear();
       return;
     }
+    const strokeIds = new Set(strokes.map((s) => s.id));
+    charactersRef.current = charactersRef.current.filter((c) => strokeIds.has(c.id));
+    knownIdsRef.current = new Set([...knownIdsRef.current].filter((id) => strokeIds.has(id)));
     for (const stroke of strokes) {
       if (!knownIdsRef.current.has(stroke.id)) {
         knownIdsRef.current.add(stroke.id);
@@ -1068,18 +1073,13 @@ function HeldCreatureOverlay({ creature, pos }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const W = canvas.width / dpr;
-    const H = canvas.height / dpr;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    // Resize if needed (does not run every frame — only when canvas is stale).
+    if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+    }
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
