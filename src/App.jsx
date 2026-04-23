@@ -1118,7 +1118,7 @@ function DrawingPad({ onCommit }) {
           Clear pad
         </button>
         <button type="button" className="button" onClick={sendToScreen} disabled={strokeCount === 0}>
-          {strokeCount > 0 ? `Send to screen (${strokeCount})` : 'Send to screen'}
+          Send to screen
         </button>
       </div>
     </div>
@@ -1198,9 +1198,6 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
               className="text-input"
             />
           </div>
-          <p className="muted-text">
-            Draw anything — a fish, a blob, a squiggle. Use as many strokes as you like. When you're ready, hit <strong>Send to screen</strong> and watch your creature drop into the aquarium.
-          </p>
         </section>
 
         <section className="panel">
