@@ -777,11 +777,13 @@ function drawAnimatedPlants(ctx, bg, t, W, H) {
 
 // ---------------------------------------------------------------------------
 // Aquarium canvas — animated host display.
-// heldIdRef  — ref to the id of a creature being dragged (skip its physics)
-// heldPosRef — ref to {x,y} normalised position of that creature
+// heldIdRef   — ref to the id of a creature being dragged (skip its physics)
+// heldPosRef  — ref to {x,y} normalised position of that creature
 // positionsRef — ref that this component fills each frame with [{id,x,y}]
+// teleportRef — ref set by HostView when a creature is dropped: {id, x, y}
+//               normalised; AquariumCanvas consumes it and moves the creature
 // ---------------------------------------------------------------------------
-function AquariumCanvas({ strokes, heldIdRef = null, heldPosRef = null, positionsRef = null }) {
+function AquariumCanvas({ strokes, heldIdRef = null, heldPosRef = null, positionsRef = null, teleportRef = null }) {
   const canvasRef = useRef(null);
   const charactersRef = useRef([]);
   const bubblesRef = useRef([]);
@@ -919,6 +921,14 @@ function AquariumCanvas({ strokes, heldIdRef = null, heldPosRef = null, position
         ctx.fillStyle = `rgba(220, 245, 255, ${b.opacity * 0.85})`;
         ctx.fill();
         ctx.restore();
+      }
+
+      // Consume any pending teleport (creature dropped at a specific position).
+      if (teleportRef?.current) {
+        const { id, x, y } = teleportRef.current;
+        teleportRef.current = null;
+        const tc = charactersRef.current.find((c) => c.id === id);
+        if (tc) { tc.x = x; tc.y = y; tc.baseY = y; tc.phase = 'swim'; tc.holdUntil = 0; }
       }
 
       // Characters.
@@ -1135,12 +1145,10 @@ function SideAquarium({ creatures, onReleaseAll }) {
     }
 
     const size = Math.min(W * 0.6, 72);
-    const spacing = Math.min(H / creatures.length, size * 1.8);
-    const startY = (H - spacing * (creatures.length - 1)) / 2;
-
-    creatures.forEach((creature, i) => {
-      const cx = W / 2;
-      const cy = startY + i * spacing;
+    creatures.forEach((creature) => {
+      // Use stored drop position, clamped to canvas bounds.
+      const cx = Math.max(size / 2, Math.min(W - size / 2, creature.dropX ?? W / 2));
+      const cy = Math.max(size / 2, Math.min(H - size / 2, creature.dropY ?? H / 2));
       ctx.save();
       ctx.shadowColor = 'rgba(0, 212, 255, 0.45)';
       ctx.shadowBlur = 22;
@@ -1361,6 +1369,7 @@ function HostView({ room, shared, onResetRoom }) {
   const heldPosRef = useRef(null);          // normalised {x,y} of that creature
   const hiddenIdsRef = useRef(new Set());   // ids moved to the side panel
   const creaturePositionsRef = useRef([]); // filled by AquariumCanvas each frame
+  const teleportRef = useRef(null);         // consumed by AquariumCanvas to place dropped creature
   const sharedStrokesRef = useRef(shared.strokes);
   useEffect(() => { sharedStrokesRef.current = shared.strokes; }, [shared.strokes]);
 
@@ -1412,15 +1421,28 @@ function HostView({ room, shared, onResetRoom }) {
     pinchCbRef.current.onEnd = (pos) => {
       const id = heldIdRef.current;
       if (!id) return;
-      // If released over the side panel, move creature there.
-      if (pos && pos.x > window.innerWidth - SIDE_PANEL_W) {
+      const canvasW = window.innerWidth - SIDE_PANEL_W;
+
+      if (pos && pos.x > canvasW) {
+        // Dropped in side panel — store drop position relative to panel left edge.
         const creature = sharedStrokesRef.current.find((s) => s.id === id);
         if (creature) {
-          setSideCreatures((prev) => [...prev.filter((c) => c.id !== id), creature]);
+          setSideCreatures((prev) => [
+            ...prev.filter((c) => c.id !== id),
+            { ...creature, dropX: pos.x - canvasW, dropY: pos.y },
+          ]);
           hiddenIdsRef.current = new Set([...hiddenIdsRef.current, id]);
           setHiddenIds(new Set(hiddenIdsRef.current));
         }
+      } else if (pos) {
+        // Dropped in main aquarium — teleport creature to drop position.
+        teleportRef.current = {
+          id,
+          x: Math.max(0.04, Math.min(0.96, pos.x / canvasW)),
+          y: Math.max(0.10, Math.min(0.88, pos.y / window.innerHeight)),
+        };
       }
+
       heldIdRef.current = null;
       heldPosRef.current = null;
       setHeldCreature(null);
@@ -1448,6 +1470,7 @@ function HostView({ room, shared, onResetRoom }) {
             heldIdRef={heldIdRef}
             heldPosRef={heldPosRef}
             positionsRef={creaturePositionsRef}
+            teleportRef={teleportRef}
           />
         </div>
         <SideAquarium
