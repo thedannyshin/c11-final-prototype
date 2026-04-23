@@ -1102,11 +1102,6 @@ function DrawingPad({ onCommit }) {
             />
           ))}
         </div>
-        <input
-          type="range" min="2" max="20" value={size}
-          onChange={(e) => setSize(Number(e.target.value))}
-          className="size-slider"
-        />
         <div className="pad-actions">
           <button type="button" className="button button-secondary" onClick={clearPad}>Clear</button>
           <button type="button" className="button" onClick={sendToScreen} disabled={strokeCount === 0}>Send</button>
