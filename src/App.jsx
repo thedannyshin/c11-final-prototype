@@ -934,120 +934,69 @@ function AquariumCanvas({ strokes }) {
 
 // ---------------------------------------------------------------------------
 // Drawing pad — multi-stroke, bundles on Send.
+// Incremental drawing: each touchmove only draws one new segment, never
+// repaints old strokes. Committed strokes live on an offscreen canvas that
+// is blitted once on stroke-end, not on every move event.
 // ---------------------------------------------------------------------------
 function DrawingPad({ onCommit }) {
   const canvasRef = useRef(null);
-  // Offscreen canvas holds all committed strokes — never redrawn during a live stroke.
-  const committedCanvasRef = useRef(null);
+  const ctxRef = useRef(null);
+  const committedRef = useRef(null); // offscreen canvas — all finished strokes
   const draftRef = useRef([]);
   const submittedRef = useRef([]);
   const drawingRef = useRef(false);
-  const rafRef = useRef(null);
   const colorRef = useRef(DEFAULT_COLOR);
   const sizeRef = useRef(4);
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [size, setSize] = useState(4);
   const [strokeCount, setStrokeCount] = useState(0);
 
-  // Keep refs in sync so RAF callbacks always read the latest values.
   useEffect(() => { colorRef.current = color; }, [color]);
   useEffect(() => { sizeRef.current = size; }, [size]);
 
-  const getCanvas = () => canvasRef.current;
-  const getDpr = () => window.devicePixelRatio || 1;
+  // Build/rebuild the offscreen committed canvas and blit it to the main canvas.
+  const rebakeAndBlit = () => {
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
 
-  // Initialise both canvases to the correct physical pixel size.
-  const initCanvases = () => {
-    const canvas = getCanvas();
-    if (!canvas) return;
-    const dpr = getDpr();
-    const rect = canvas.getBoundingClientRect();
-    const W = Math.round(rect.width * dpr);
-    const H = Math.round(rect.height * dpr);
-    if (canvas.width !== W || canvas.height !== H) {
-      canvas.width = W;
-      canvas.height = H;
-    }
-    if (!committedCanvasRef.current) {
-      committedCanvasRef.current = document.createElement('canvas');
-    }
-    const oc = committedCanvasRef.current;
-    if (oc.width !== W || oc.height !== H) {
-      oc.width = W;
-      oc.height = H;
-      rebakeCommitted();
-    }
-  };
-
-  // Redraw all completed strokes onto the offscreen canvas.
-  const rebakeCommitted = () => {
-    const oc = committedCanvasRef.current;
-    if (!oc) return;
-    const ctx = oc.getContext('2d');
-    const dpr = getDpr();
-    ctx.clearRect(0, 0, oc.width, oc.height);
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, oc.width, oc.height);
+    if (!committedRef.current) committedRef.current = document.createElement('canvas');
+    const oc = committedRef.current;
+    oc.width = canvas.width;
+    oc.height = canvas.height;
+    const ocCtx = oc.getContext('2d');
+    ocCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ocCtx.fillStyle = '#fff';
+    ocCtx.fillRect(0, 0, w, h);
     for (const path of submittedRef.current) {
-      ctx.save();
-      drawPath(
-        ctx,
-        path.points.map((p) => ({ x: p.x * oc.width, y: p.y * oc.height })),
-        path.color,
-        path.size * dpr,
-      );
-      ctx.restore();
+      ocCtx.save();
+      drawPath(ocCtx, path.points.map((p) => ({ x: p.x * w, y: p.y * h })), path.color, path.size);
+      ocCtx.restore();
     }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.drawImage(oc, 0, 0, w, h);
   };
 
-  // Composite: blit committed layer + draw the live draft segment on top.
-  const renderFrame = () => {
-    rafRef.current = null;
-    const canvas = getCanvas();
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const dpr = getDpr();
-    const W = canvas.width;
-    const H = canvas.height;
-
-    if (committedCanvasRef.current) {
-      ctx.drawImage(committedCanvasRef.current, 0, 0);
-    } else {
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, W, H);
-    }
-
-    const draft = draftRef.current;
-    if (draft.length > 1) {
-      ctx.save();
-      drawPath(
-        ctx,
-        draft.map((p) => ({ x: p.x * W, y: p.y * H })),
-        colorRef.current,
-        sizeRef.current * dpr,
-      );
-      ctx.restore();
-    }
-  };
-
-  const scheduleRender = () => {
-    if (!rafRef.current) rafRef.current = requestAnimationFrame(renderFrame);
-  };
-
+  // One-time canvas setup — sets physical pixel size and scales context.
   useEffect(() => {
-    initCanvases();
-    rebakeCommitted();
-    scheduleRender();
-    const onResize = () => { initCanvases(); rebakeCommitted(); scheduleRender(); };
-    window.addEventListener('resize', onResize);
-    return () => { window.removeEventListener('resize', onResize); cancelAnimationFrame(rafRef.current); };
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.offsetWidth;
+    const h = canvas.offsetHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctxRef.current = ctx;
+    rebakeAndBlit();
   }, []);
 
-  // Rebake when color/size changes (clears old draft preview).
-  useEffect(() => { rebakeCommitted(); scheduleRender(); }, [color, size]);
-
   const getPoint = (event) => {
-    const canvas = getCanvas();
+    const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const touch = event.touches?.[0] || event.changedTouches?.[0];
     const clientX = touch ? touch.clientX : event.clientX;
@@ -1057,17 +1006,34 @@ function DrawingPad({ onCommit }) {
 
   const start = (event) => {
     event.preventDefault();
-    initCanvases();
     drawingRef.current = true;
-    draftRef.current = [getPoint(event)];
-    scheduleRender();
+    const pt = getPoint(event);
+    draftRef.current = [pt];
+    // Blit committed so any previous live-stroke artifact is gone.
+    rebakeAndBlit();
   };
 
   const move = (event) => {
     if (!drawingRef.current) return;
     event.preventDefault();
-    draftRef.current.push(getPoint(event));
-    scheduleRender();
+    const pt = getPoint(event);
+    const prev = draftRef.current[draftRef.current.length - 1];
+    draftRef.current.push(pt);
+
+    // Draw only the new segment — no clear, no loop over previous points.
+    const ctx = ctxRef.current;
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas || !prev) return;
+    const w = canvas.offsetWidth;
+    const h = canvas.offsetHeight;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = colorRef.current;
+    ctx.lineWidth = sizeRef.current;
+    ctx.beginPath();
+    ctx.moveTo(prev.x * w, prev.y * h);
+    ctx.lineTo(pt.x * w, pt.y * h);
+    ctx.stroke();
   };
 
   const end = (event) => {
@@ -1075,12 +1041,13 @@ function DrawingPad({ onCommit }) {
     event.preventDefault();
     drawingRef.current = false;
     if (draftRef.current.length > 1) {
-      submittedRef.current = [...submittedRef.current, { color: colorRef.current, size: sizeRef.current, points: [...draftRef.current] }];
+      submittedRef.current = [...submittedRef.current, {
+        color: colorRef.current, size: sizeRef.current, points: [...draftRef.current],
+      }];
       setStrokeCount((c) => c + 1);
     }
     draftRef.current = [];
-    rebakeCommitted();
-    scheduleRender();
+    rebakeAndBlit();
   };
 
   const sendToScreen = () => {
@@ -1091,16 +1058,14 @@ function DrawingPad({ onCommit }) {
     submittedRef.current = [];
     draftRef.current = [];
     setStrokeCount(0);
-    rebakeCommitted();
-    scheduleRender();
+    rebakeAndBlit();
   };
 
   const clearPad = () => {
     submittedRef.current = [];
     draftRef.current = [];
     setStrokeCount(0);
-    rebakeCommitted();
-    scheduleRender();
+    rebakeAndBlit();
   };
 
   return (
