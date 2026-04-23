@@ -1157,26 +1157,20 @@ function DrawingPad({ onCommit }) {
 // ---------------------------------------------------------------------------
 function HostView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
-  const [muted, setMuted] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const audioRef = useRef(null);
-  const participantCount = Object.keys(shared.participants).length;
 
-  useEffect(() => {
+  const toggleMusic = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.volume = 0.4;
-    audio.play().catch(() => {});
-  }, []);
-
-  const toggleMute = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (muted) {
-      audio.play().catch(() => {});
-    } else {
+    if (playing) {
       audio.pause();
+      setPlaying(false);
+    } else {
+      audio.volume = 0.4;
+      audio.play().catch(() => {});
+      setPlaying(true);
     }
-    setMuted((m) => !m);
   };
 
   return (
@@ -1187,8 +1181,6 @@ function HostView({ room, shared, onResetRoom }) {
       <div className="host-hud">
         <span className="hud-room">Room&nbsp;<strong>{room}</strong></span>
         <span className="hud-divider" />
-        <span className="hud-count">{participantCount} joined</span>
-        <span className="hud-divider" />
         <button type="button" className="hud-btn" onClick={shared.clearCanvas}>
           Clear
         </button>
@@ -1196,8 +1188,8 @@ function HostView({ room, shared, onResetRoom }) {
           New room
         </button>
         <span className="hud-divider" />
-        <button type="button" className="hud-btn" onClick={toggleMute}>
-          {muted ? '🔇 Music' : '🔊 Music'}
+        <button type="button" className="hud-btn" onClick={toggleMusic}>
+          {playing ? '⏸ Music' : '▶ Music'}
         </button>
       </div>
 
