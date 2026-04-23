@@ -969,7 +969,7 @@ function DrawingPad({ onCommit }) {
     oc.height = canvas.height;
     const ocCtx = oc.getContext('2d');
     ocCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ocCtx.fillStyle = '#fff';
+    ocCtx.fillStyle = '#0a1628';
     ocCtx.fillRect(0, 0, w, h);
     for (const path of submittedRef.current) {
       ocCtx.save();
@@ -993,6 +993,8 @@ function DrawingPad({ onCommit }) {
     canvas.height = h * dpr;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#0a1628';
+    ctx.fillRect(0, 0, w, h);
     ctxRef.current = ctx;
     rebakeAndBlit();
 

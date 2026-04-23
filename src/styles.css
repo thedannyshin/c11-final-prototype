@@ -406,7 +406,7 @@ p {
   height: 100dvh;
   padding: 12px;
   gap: 8px;
-  background: #f8fafc;
+  background: linear-gradient(to bottom, #0d2137, #091828 55%, #050e18);
 }
 
 .participant-header {
@@ -414,6 +414,16 @@ p {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+}
+
+.participant-header .pill {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.participant-header .muted-text {
+  color: rgba(255,255,255,0.35);
 }
 
 .pad-layout {
@@ -429,10 +439,10 @@ p {
   width: 100%;
   flex: 1;
   min-height: 0;
-  background: #fff;
+  background: #0a1628;
   touch-action: none;
   border-radius: 20px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255,255,255,0.07);
 }
 
 .pad-controls {
@@ -452,19 +462,20 @@ p {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 1.5px solid rgba(0,0,0,0.1);
+  border: 1.5px solid rgba(255,255,255,0.15);
   flex-shrink: 0;
   cursor: pointer;
 }
 
 .swatch-sm.is-active {
-  outline: 2.5px solid #0f172a;
+  outline: 2.5px solid rgba(255,255,255,0.8);
   outline-offset: 2px;
 }
 
 .size-slider {
   flex: 1;
   min-width: 0;
+  accent-color: rgba(255,255,255,0.6);
 }
 
 .pad-actions {
@@ -478,6 +489,18 @@ p {
   min-height: 36px;
   font-size: 0.875rem;
   border-radius: 12px;
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.75);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.pad-actions .button:not(:disabled):hover {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+}
+
+.pad-actions .button:disabled {
+  opacity: 0.35;
 }
 
 .action-grid {
