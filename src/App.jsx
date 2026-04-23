@@ -1178,18 +1178,13 @@ function HostView({ room, shared, onResetRoom }) {
 function ParticipantView({ room, shared, clientName, setClientName, clientColor }) {
   return (
     <div className="page-shell narrow">
-      <div className="stack gap-16">
-        <section className="panel stack gap-16">
-          <h2 className="panel-title">Draw your creature</h2>
-          <div className="row wrap gap-8">
-            <span className="pill">Room {room}</span>
-          </div>
-        </section>
-
-        <section className="panel">
-          <DrawingPad onCommit={shared.addCharacter} />
-        </section>
-      </div>
+      <section className="panel stack gap-16">
+        <div>
+          <span className="pill">Room {room}</span>
+          <p className="muted-text" style={{ marginTop: 6, fontSize: '0.8125rem' }}>Draw your creature</p>
+        </div>
+        <DrawingPad onCommit={shared.addCharacter} />
+      </section>
     </div>
   );
 }
