@@ -400,12 +400,31 @@ p {
   background: #fff;
 }
 
+.participant-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 16px;
+  gap: 12px;
+  background: #f8fafc;
+}
+
+.participant-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .drawing-pad {
   display: block;
   width: 100%;
-  height: 55vh;
+  flex: 1;
+  min-height: 0;
   background: #fff;
   touch-action: none;
+  border-radius: 24px;
+  border: 1px solid #e2e8f0;
 }
 
 .action-grid {

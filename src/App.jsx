@@ -1102,16 +1102,14 @@ function DrawingPad({ onCommit }) {
         <input type="range" min="2" max="20" value={size} onChange={(e) => setSize(Number(e.target.value))} />
       </div>
 
-      <div className="pad-frame">
-        <canvas
-          ref={canvasRef}
-          className="drawing-pad"
-          onMouseDown={start}
-          onMouseMove={move}
-          onMouseUp={end}
-          onMouseLeave={end}
-        />
-      </div>
+      <canvas
+        ref={canvasRef}
+        className="drawing-pad"
+        onMouseDown={start}
+        onMouseMove={move}
+        onMouseUp={end}
+        onMouseLeave={end}
+      />
 
       <div className="action-grid">
         <button type="button" className="button button-secondary" onClick={clearPad}>
@@ -1177,14 +1175,12 @@ function HostView({ room, shared, onResetRoom }) {
 
 function ParticipantView({ room, shared, clientName, setClientName, clientColor }) {
   return (
-    <div className="page-shell narrow">
-      <section className="panel stack gap-16">
-        <div>
-          <span className="pill">Room {room}</span>
-          <p className="muted-text" style={{ marginTop: 6, fontSize: '0.8125rem' }}>Draw your creature</p>
-        </div>
-        <DrawingPad onCommit={shared.addCharacter} />
-      </section>
+    <div className="participant-shell">
+      <div className="participant-header">
+        <span className="pill">Room {room}</span>
+        <span className="muted-text" style={{ fontSize: '0.8125rem' }}>Draw your creature</span>
+      </div>
+      <DrawingPad onCommit={shared.addCharacter} />
     </div>
   );
 }
