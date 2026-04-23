@@ -233,9 +233,15 @@ function useHandTracking(enabled) {
           const lm = results.multiHandLandmarks[0];
           const tip = lm[8];   // index fingertip
           const thumb = lm[4]; // thumb tip
-          // Mirror x so it matches the user's perspective
-          const rawX = (1 - tip.x) * window.innerWidth;
-          const rawY = tip.y * window.innerHeight;
+          // Mirror x so it matches the user's perspective.
+          // Remap a centred 55% band of the camera frame to the full screen so
+          // the user doesn't have to move their hand to the very edge of frame.
+          const CAM_PAD_X = 0.22;  // ignore outer 22% on each side horizontally
+          const CAM_PAD_Y = 0.15;  // ignore outer 15% on each side vertically
+          const normX = Math.max(0, Math.min(1, ((1 - tip.x) - CAM_PAD_X) / (1 - 2 * CAM_PAD_X)));
+          const normY = Math.max(0, Math.min(1, (tip.y - CAM_PAD_Y) / (1 - 2 * CAM_PAD_Y)));
+          const rawX = normX * window.innerWidth;
+          const rawY = normY * window.innerHeight;
           // Exponential smoothing to reduce jitter
           if (smoothRef.x === null) { smoothRef.x = rawX; smoothRef.y = rawY; }
           else { smoothRef.x += (rawX - smoothRef.x) * SMOOTH; smoothRef.y += (rawY - smoothRef.y) * SMOOTH; }
