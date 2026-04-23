@@ -1072,23 +1072,21 @@ function HeldCreatureOverlay({ creature, pos }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
+    // Use plain CSS pixel dimensions — no DPR scaling. This overlay is a
+    // transient drag layer; retina sharpness is not needed, and DPR transforms
+    // cause coordinate mismatches with the fingertip CSS pixel position.
     const W = window.innerWidth;
     const H = window.innerHeight;
-    // Resize if needed (does not run every frame — only when canvas is stale).
-    if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
-      canvas.width = W * dpr;
-      canvas.height = H * dpr;
-    }
+    canvas.width = W;
+    canvas.height = H;
     const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     if (!creature || !pos) return;
     const size = Math.min(W, H) * 0.13;
     ctx.save();
     ctx.shadowColor = '#00D4FF';
-    ctx.shadowBlur = 40;
-    drawCharacterAt(ctx, creature, pos.x, pos.y, size * 1.15, 0);
+    ctx.shadowBlur = 30;
+    drawCharacterAt(ctx, creature, pos.x, pos.y, size, 0);
     ctx.restore();
   }, [creature, pos]);
 
