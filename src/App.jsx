@@ -1105,7 +1105,7 @@ function DrawingPad({ onCommit }) {
           ))}
         </div>
         <div className="pad-actions">
-          <button type="button" className="button button-secondary" onClick={clearPad}>Clear</button>
+          <button type="button" className="button button-secondary" onClick={clearPad} disabled={strokeCount === 0}>Clear</button>
           <button type="button" className="button" onClick={sendToScreen} disabled={strokeCount === 0}>Send</button>
         </div>
       </div>
