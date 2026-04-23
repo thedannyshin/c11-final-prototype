@@ -7,6 +7,7 @@ const CANVAS_W = 1200;
 const CANVAS_H = 700;
 const DEFAULT_COLOR = '#00D4FF';
 const COLORS = ['#FFFFFF', '#00D4FF', '#F43F5E', '#10B981', '#FBBF24', '#A78BFA'];
+const SIDE_PANEL_W = 300;
 
 function makeId(len = 6) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -167,6 +168,116 @@ function createTransport(roomId) {
       listeners.clear();
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// MediaPipe Hands loader — loads CDN script once, resolves when ready.
+// ---------------------------------------------------------------------------
+let _mpHandsPromise = null;
+function loadMediaPipeHands() {
+  if (_mpHandsPromise) return _mpHandsPromise;
+  _mpHandsPromise = new Promise((resolve, reject) => {
+    if (window.Hands) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js';
+    s.crossOrigin = 'anonymous';
+    s.onload = () => (window.Hands ? resolve() : reject(new Error('Hands global missing')));
+    s.onerror = () => reject(new Error('Failed to load MediaPipe Hands'));
+    document.head.appendChild(s);
+  });
+  return _mpHandsPromise;
+}
+
+// ---------------------------------------------------------------------------
+// useHandTracking — webcam + MediaPipe, calls onStart/onEnd via pinchCbRef.
+// Returns { fingertipPos, pinchCbRef } where pinchCbRef.current = { onStart, onEnd }.
+// ---------------------------------------------------------------------------
+function useHandTracking(enabled) {
+  const [fingertipPos, setFingertipPos] = useState(null);
+  const pinchCbRef = useRef({ onStart: null, onEnd: null });
+  const prevPinchRef = useRef(false);
+
+  useEffect(() => {
+    if (!enabled) { setFingertipPos(null); return; }
+    let active = true;
+
+    async function init() {
+      try {
+        await loadMediaPipeHands();
+        if (!active) return;
+
+        const hands = new window.Hands({
+          locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
+        });
+        hands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 0,
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.5,
+        });
+        hands.onResults((results) => {
+          if (!active) return;
+          if (!results.multiHandLandmarks?.length) {
+            setFingertipPos(null);
+            if (prevPinchRef.current) {
+              prevPinchRef.current = false;
+              pinchCbRef.current.onEnd?.(null);
+            }
+            return;
+          }
+          const lm = results.multiHandLandmarks[0];
+          const tip = lm[8];   // index fingertip
+          const thumb = lm[4]; // thumb tip
+          // Mirror x so it matches the user's perspective
+          const sx = (1 - tip.x) * window.innerWidth;
+          const sy = tip.y * window.innerHeight;
+          setFingertipPos({ x: sx, y: sy });
+
+          const dx = (tip.x - thumb.x) * window.innerWidth;
+          const dy = (tip.y - thumb.y) * window.innerHeight;
+          const pinching = Math.sqrt(dx * dx + dy * dy) < 55;
+
+          if (pinching && !prevPinchRef.current) pinchCbRef.current.onStart?.({ x: sx, y: sy });
+          if (!pinching && prevPinchRef.current) pinchCbRef.current.onEnd?.({ x: sx, y: sy });
+          prevPinchRef.current = pinching;
+        });
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480, facingMode: 'user' },
+        });
+        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
+
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.playsInline = true;
+        await video.play();
+
+        let rafId;
+        const loop = async () => {
+          if (!active) return;
+          if (video.readyState >= 2) await hands.send({ image: video });
+          rafId = requestAnimationFrame(loop);
+        };
+        rafId = requestAnimationFrame(loop);
+
+        return () => {
+          active = false;
+          cancelAnimationFrame(rafId);
+          stream.getTracks().forEach((t) => t.stop());
+        };
+      } catch (err) {
+        console.warn('Hand tracking unavailable:', err);
+      }
+    }
+
+    const cleanupPromise = init();
+    return () => {
+      active = false;
+      cleanupPromise.then((cleanup) => cleanup?.());
+    };
+  }, [enabled]);
+
+  return { fingertipPos, pinchCbRef };
 }
 
 // ---------------------------------------------------------------------------
@@ -656,8 +767,11 @@ function drawAnimatedPlants(ctx, bg, t, W, H) {
 
 // ---------------------------------------------------------------------------
 // Aquarium canvas — animated host display.
+// heldIdRef  — ref to the id of a creature being dragged (skip its physics)
+// heldPosRef — ref to {x,y} normalised position of that creature
+// positionsRef — ref that this component fills each frame with [{id,x,y}]
 // ---------------------------------------------------------------------------
-function AquariumCanvas({ strokes }) {
+function AquariumCanvas({ strokes, heldIdRef = null, heldPosRef = null, positionsRef = null }) {
   const canvasRef = useRef(null);
   const charactersRef = useRef([]);
   const bubblesRef = useRef([]);
@@ -674,8 +788,8 @@ function AquariumCanvas({ strokes }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const fit = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
+      canvas.width  = canvas.parentElement?.offsetWidth  || window.innerWidth;
+      canvas.height = canvas.parentElement?.offsetHeight || window.innerHeight;
       staticLayerRef.current = renderStaticBg(bgRef.current, canvas.width, canvas.height);
     };
     fit();
@@ -795,6 +909,20 @@ function AquariumCanvas({ strokes }) {
       // Characters.
       const charSize = Math.min(W, H) * 0.13;
       for (const c of charactersRef.current) {
+        const isHeld = heldIdRef?.current === c.id;
+
+        // Held by fingertip — draw at pointer position, skip all physics.
+        if (isHeld && heldPosRef?.current) {
+          const px = heldPosRef.current.x * W;
+          const py = heldPosRef.current.y * H;
+          ctx.save();
+          ctx.shadowColor = '#00D4FF';
+          ctx.shadowBlur = 40;
+          drawCharacterAt(ctx, c.character, px, py, charSize * 1.15, 0);
+          ctx.restore();
+          continue;
+        }
+
         if (c.phase === 'drop') {
           // Spring toward target depth — fast at first, eases off as it arrives.
           c.y += (c.targetY - c.y) * 0.028;
@@ -840,6 +968,11 @@ function AquariumCanvas({ strokes }) {
           // Facing direction: mirror horizontally when going left, no tilt.
           drawCharacterAt(ctx, c.character, c.x * W, c.y * H, charSize, c.dir === -1 ? Math.PI : 0);
         }
+      }
+
+      // Export normalised creature positions for drag hit-testing.
+      if (positionsRef) {
+        positionsRef.current = charactersRef.current.map((c) => ({ id: c.id, x: c.x, y: c.y }));
       }
 
       // Collision — only fire when characters are actively swimming toward each
@@ -930,6 +1063,67 @@ function AquariumCanvas({ strokes }) {
   }, []);
 
   return <canvas ref={canvasRef} className="aquarium-canvas" />;
+}
+
+// ---------------------------------------------------------------------------
+// Side aquarium — static glowing display of creatures dragged from main tank.
+// ---------------------------------------------------------------------------
+function SideAquarium({ creatures, onReleaseAll }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const W = canvas.offsetWidth;
+    const H = canvas.offsetHeight;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0a1a30');
+    bg.addColorStop(1, '#050e18');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    if (!creatures.length) {
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Drag creatures here', W / 2, H / 2 - 8);
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillText('using your fingertip', W / 2, H / 2 + 10);
+      return;
+    }
+
+    const size = Math.min(W * 0.6, 72);
+    const spacing = Math.min(H / creatures.length, size * 1.8);
+    const startY = (H - spacing * (creatures.length - 1)) / 2;
+
+    creatures.forEach((creature, i) => {
+      const cx = W / 2;
+      const cy = startY + i * spacing;
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 212, 255, 0.45)';
+      ctx.shadowBlur = 22;
+      drawCharacterAt(ctx, creature, cx, cy, size, 0);
+      ctx.restore();
+    });
+  }, [creatures]);
+
+  return (
+    <div className="side-panel">
+      <div className="side-panel-header">
+        <span className="side-panel-title">Showcase</span>
+        {creatures.length > 0 && (
+          <button type="button" className="hud-btn" onClick={onReleaseAll} style={{ fontSize: '0.7rem' }}>
+            Release all
+          </button>
+        )}
+      </div>
+      <canvas ref={canvasRef} className="side-canvas" />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1119,38 +1313,127 @@ function DrawingPad({ onCommit }) {
 function HostView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
   const [playing, setPlaying] = useState(false);
+  const [handEnabled, setHandEnabled] = useState(false);
   const audioRef = useRef(null);
+
+  // ── Drag state ────────────────────────────────────────────────────────────
+  // Use refs for the hot path (updated every RAF frame) and state only for
+  // values that must trigger a re-render.
+  const heldIdRef = useRef(null);           // id of creature currently grabbed
+  const heldPosRef = useRef(null);          // normalised {x,y} of that creature
+  const hiddenIdsRef = useRef(new Set());   // ids moved to the side panel
+  const creaturePositionsRef = useRef([]); // filled by AquariumCanvas each frame
+  const sharedStrokesRef = useRef(shared.strokes);
+  useEffect(() => { sharedStrokesRef.current = shared.strokes; }, [shared.strokes]);
+
+  const [hiddenIds, setHiddenIds] = useState(new Set());
+  const [sideCreatures, setSideCreatures] = useState([]);
+
+  // ── Hand tracking ─────────────────────────────────────────────────────────
+  const { fingertipPos, pinchCbRef } = useHandTracking(handEnabled);
+
+  // Keep heldPos in sync with the fingertip while dragging.
+  useEffect(() => {
+    if (!heldIdRef.current || !fingertipPos) return;
+    const canvasW = window.innerWidth - SIDE_PANEL_W;
+    const canvasH = window.innerHeight;
+    heldPosRef.current = {
+      x: Math.max(0, Math.min(1, fingertipPos.x / canvasW)),
+      y: Math.max(0, Math.min(1, fingertipPos.y / canvasH)),
+    };
+  }, [fingertipPos]);
+
+  // Wire pinch callbacks once — they read from refs so no stale-closure issue.
+  useEffect(() => {
+    pinchCbRef.current.onStart = (pos) => {
+      if (heldIdRef.current || !pos) return;
+      const canvasW = window.innerWidth - SIDE_PANEL_W;
+      const canvasH = window.innerHeight;
+      const normX = pos.x / canvasW;
+      const normY = pos.y / canvasH;
+      const threshold = Math.min(canvasW, canvasH) * 0.15;
+
+      let nearest = null;
+      let nearestDist = Infinity;
+      for (const c of creaturePositionsRef.current) {
+        if (hiddenIdsRef.current.has(c.id)) continue;
+        const dx = (c.x - normX) * canvasW;
+        const dy = (c.y - normY) * canvasH;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < nearestDist) { nearest = c; nearestDist = dist; }
+      }
+      if (nearest && nearestDist < threshold) {
+        heldIdRef.current = nearest.id;
+        heldPosRef.current = { x: normX, y: normY };
+      }
+    };
+
+    pinchCbRef.current.onEnd = (pos) => {
+      const id = heldIdRef.current;
+      if (!id) return;
+      // If released over the side panel, move creature there.
+      if (pos && pos.x > window.innerWidth - SIDE_PANEL_W) {
+        const creature = sharedStrokesRef.current.find((s) => s.id === id);
+        if (creature) {
+          setSideCreatures((prev) => [...prev.filter((c) => c.id !== id), creature]);
+          hiddenIdsRef.current = new Set([...hiddenIdsRef.current, id]);
+          setHiddenIds(new Set(hiddenIdsRef.current));
+        }
+      }
+      heldIdRef.current = null;
+      heldPosRef.current = null;
+    };
+  }, []);
 
   const toggleMusic = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (playing) {
-      audio.pause();
-      setPlaying(false);
-    } else {
-      audio.volume = 0.4;
-      audio.play().catch(() => {});
-      setPlaying(true);
-    }
+    if (playing) { audio.pause(); setPlaying(false); }
+    else { audio.volume = 0.4; audio.play().catch(() => {}); setPlaying(true); }
   };
+
+  const visibleStrokes = shared.strokes.filter((s) => !hiddenIds.has(s.id));
 
   return (
     <div className="host-fullscreen">
       <audio ref={audioRef} src="/music.mp3" loop />
-      <AquariumCanvas key={room} strokes={shared.strokes} />
+
+      <div className="host-layout">
+        <div className="aquarium-wrapper">
+          <AquariumCanvas
+            key={room}
+            strokes={visibleStrokes}
+            heldIdRef={heldIdRef}
+            heldPosRef={heldPosRef}
+            positionsRef={creaturePositionsRef}
+          />
+        </div>
+        <SideAquarium
+          creatures={sideCreatures}
+          onReleaseAll={() => {
+            setSideCreatures([]);
+            hiddenIdsRef.current = new Set();
+            setHiddenIds(new Set());
+          }}
+        />
+      </div>
 
       <div className="host-hud">
         <span className="hud-room">Room&nbsp;<strong>{room}</strong></span>
         <span className="hud-divider" />
-        <button type="button" className="hud-btn" onClick={shared.clearCanvas}>
-          Clear
-        </button>
-        <button type="button" className="hud-btn" onClick={onResetRoom}>
-          New room
-        </button>
+        <button type="button" className="hud-btn" onClick={shared.clearCanvas}>Clear</button>
+        <button type="button" className="hud-btn" onClick={onResetRoom}>New room</button>
         <span className="hud-divider" />
         <button type="button" className="hud-btn" onClick={toggleMusic}>
           {playing ? '⏸ Music' : '▶ Music'}
+        </button>
+        <span className="hud-divider" />
+        <button
+          type="button"
+          className={`hud-btn${handEnabled ? ' hud-btn-active' : ''}`}
+          onClick={() => setHandEnabled((e) => !e)}
+        >
+          {handEnabled ? '✋ On' : '✋ Off'}
         </button>
       </div>
 
@@ -1159,6 +1442,13 @@ function HostView({ room, shared, onResetRoom }) {
         <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
         <div className="qr-room">{room}</div>
       </div>
+
+      {fingertipPos && handEnabled && (
+        <div
+          className={`fingertip-cursor${heldIdRef.current ? ' is-grabbing' : ''}`}
+          style={{ left: fingertipPos.x, top: fingertipPos.y }}
+        />
+      )}
     </div>
   );
 }
