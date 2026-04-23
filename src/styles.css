@@ -400,6 +400,13 @@ p {
 }
 
 /* ── Fingertip cursor ────────────────────────────────────────────────────── */
+.held-creature-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 150;
+}
+
 .fingertip-cursor {
   position: fixed;
   width: 22px;

@@ -911,17 +911,8 @@ function AquariumCanvas({ strokes, heldIdRef = null, heldPosRef = null, position
       for (const c of charactersRef.current) {
         const isHeld = heldIdRef?.current === c.id;
 
-        // Held by fingertip — draw at pointer position, skip all physics.
-        if (isHeld && heldPosRef?.current) {
-          const px = heldPosRef.current.x * W;
-          const py = heldPosRef.current.y * H;
-          ctx.save();
-          ctx.shadowColor = '#00D4FF';
-          ctx.shadowBlur = 40;
-          drawCharacterAt(ctx, c.character, px, py, charSize * 1.15, 0);
-          ctx.restore();
-          continue;
-        }
+        // Held by fingertip — rendered by the full-screen overlay instead.
+        if (isHeld) continue;
 
         if (c.phase === 'drop') {
           // Spring toward target depth — fast at first, eases off as it arrives.
@@ -1063,6 +1054,45 @@ function AquariumCanvas({ strokes, heldIdRef = null, heldPosRef = null, position
   }, []);
 
   return <canvas ref={canvasRef} className="aquarium-canvas" />;
+}
+
+// ---------------------------------------------------------------------------
+// HeldCreatureOverlay — full-screen fixed canvas that draws the grabbed
+// creature directly at fingertip pixel coordinates, unrestricted by panel
+// boundaries, so it travels smoothly across both the aquarium and side panel.
+// ---------------------------------------------------------------------------
+function HeldCreatureOverlay({ creature, pos }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.width / dpr;
+    const H = canvas.height / dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    if (!creature || !pos) return;
+    const size = Math.min(W, H) * 0.13;
+    ctx.save();
+    ctx.shadowColor = '#00D4FF';
+    ctx.shadowBlur = 40;
+    drawCharacterAt(ctx, creature, pos.x, pos.y, size * 1.15, 0);
+    ctx.restore();
+  }, [creature, pos]);
+
+  return <canvas ref={canvasRef} className="held-creature-overlay" />;
 }
 
 // ---------------------------------------------------------------------------
@@ -1328,6 +1358,7 @@ function HostView({ room, shared, onResetRoom }) {
 
   const [hiddenIds, setHiddenIds] = useState(new Set());
   const [sideCreatures, setSideCreatures] = useState([]);
+  const [heldCreature, setHeldCreature] = useState(null);
 
   // ── Hand tracking ─────────────────────────────────────────────────────────
   const { fingertipPos, pinchCbRef } = useHandTracking(handEnabled);
@@ -1363,8 +1394,10 @@ function HostView({ room, shared, onResetRoom }) {
         if (dist < nearestDist) { nearest = c; nearestDist = dist; }
       }
       if (nearest && nearestDist < threshold) {
+        const creature = sharedStrokesRef.current.find((s) => s.id === nearest.id);
         heldIdRef.current = nearest.id;
         heldPosRef.current = { x: normX, y: normY };
+        setHeldCreature(creature || null);
       }
     };
 
@@ -1382,6 +1415,7 @@ function HostView({ room, shared, onResetRoom }) {
       }
       heldIdRef.current = null;
       heldPosRef.current = null;
+      setHeldCreature(null);
     };
   }, []);
 
@@ -1443,9 +1477,11 @@ function HostView({ room, shared, onResetRoom }) {
         <div className="qr-room">{room}</div>
       </div>
 
+      <HeldCreatureOverlay creature={heldCreature} pos={fingertipPos} />
+
       {fingertipPos && handEnabled && (
         <div
-          className={`fingertip-cursor${heldIdRef.current ? ' is-grabbing' : ''}`}
+          className={`fingertip-cursor${heldCreature ? ' is-grabbing' : ''}`}
           style={{ left: fingertipPos.x, top: fingertipPos.y }}
         />
       )}
