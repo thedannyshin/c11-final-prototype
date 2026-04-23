@@ -403,9 +403,9 @@ p {
 .participant-shell {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  padding: 16px;
-  gap: 12px;
+  height: 100dvh;
+  padding: 12px;
+  gap: 8px;
   background: #f8fafc;
 }
 
@@ -416,6 +416,14 @@ p {
   flex-shrink: 0;
 }
 
+.pad-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .drawing-pad {
   display: block;
   width: 100%;
@@ -423,8 +431,53 @@ p {
   min-height: 0;
   background: #fff;
   touch-action: none;
-  border-radius: 24px;
+  border-radius: 20px;
   border: 1px solid #e2e8f0;
+}
+
+.pad-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.swatches-inline {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.swatch-sm {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,0.1);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.swatch-sm.is-active {
+  outline: 2.5px solid #0f172a;
+  outline-offset: 2px;
+}
+
+.size-slider {
+  flex: 1;
+  min-width: 0;
+}
+
+.pad-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pad-actions .button {
+  padding: 8px 12px;
+  min-height: 36px;
+  font-size: 0.875rem;
+  border-radius: 12px;
 }
 
 .action-grid {

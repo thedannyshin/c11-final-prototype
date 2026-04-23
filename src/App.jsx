@@ -1080,28 +1080,7 @@ function DrawingPad({ onCommit }) {
   };
 
   return (
-    <div className="stack gap-16">
-      <div className="swatches">
-        {COLORS.map((swatch) => (
-          <button
-            key={swatch}
-            type="button"
-            onClick={() => setColor(swatch)}
-            className={`swatch ${color === swatch ? 'is-active' : ''}`}
-            style={{ backgroundColor: swatch }}
-            aria-label={`Choose ${swatch}`}
-          />
-        ))}
-      </div>
-
-      <div className="control-card stack gap-8">
-        <div className="row spread small-text">
-          <span>Brush size</span>
-          <span>{size}px</span>
-        </div>
-        <input type="range" min="2" max="20" value={size} onChange={(e) => setSize(Number(e.target.value))} />
-      </div>
-
+    <div className="pad-layout">
       <canvas
         ref={canvasRef}
         className="drawing-pad"
@@ -1110,14 +1089,28 @@ function DrawingPad({ onCommit }) {
         onMouseUp={end}
         onMouseLeave={end}
       />
-
-      <div className="action-grid">
-        <button type="button" className="button button-secondary" onClick={clearPad}>
-          Clear pad
-        </button>
-        <button type="button" className="button" onClick={sendToScreen} disabled={strokeCount === 0}>
-          Send to screen
-        </button>
+      <div className="pad-controls">
+        <div className="swatches-inline">
+          {COLORS.map((swatch) => (
+            <button
+              key={swatch}
+              type="button"
+              onClick={() => setColor(swatch)}
+              className={`swatch-sm ${color === swatch ? 'is-active' : ''}`}
+              style={{ backgroundColor: swatch }}
+              aria-label={`Choose ${swatch}`}
+            />
+          ))}
+        </div>
+        <input
+          type="range" min="2" max="20" value={size}
+          onChange={(e) => setSize(Number(e.target.value))}
+          className="size-slider"
+        />
+        <div className="pad-actions">
+          <button type="button" className="button button-secondary" onClick={clearPad}>Clear</button>
+          <button type="button" className="button" onClick={sendToScreen} disabled={strokeCount === 0}>Send</button>
+        </div>
       </div>
     </div>
   );
