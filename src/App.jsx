@@ -1183,20 +1183,6 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
           <h2 className="panel-title">Draw your creature</h2>
           <div className="row wrap gap-8">
             <span className="pill">Room {room}</span>
-            <span className="status-pill">
-              <span className="dot small" style={{ backgroundColor: clientColor }} />
-              live
-            </span>
-          </div>
-          <div className="stack gap-8">
-            <label className="label" htmlFor="participant-name">Your name</label>
-            <input
-              id="participant-name"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder="Optional"
-              className="text-input"
-            />
           </div>
         </section>
 
