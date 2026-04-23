@@ -1098,10 +1098,31 @@ function DrawingPad({ onCommit }) {
 function HostView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
   const [copied, setCopied] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const audioRef = useRef(null);
   const participantCount = Object.keys(shared.participants).length;
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = 0.4;
+    audio.play().catch(() => {});
+  }, []);
+
+  const toggleMute = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (muted) {
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+    setMuted((m) => !m);
+  };
 
   return (
     <div className="host-fullscreen">
+      <audio ref={audioRef} src="/music.mp3" loop />
       <AquariumCanvas key={room} strokes={shared.strokes} />
 
       <div className="host-hud">
@@ -1125,6 +1146,10 @@ function HostView({ room, shared, onResetRoom }) {
         </button>
         <button type="button" className="hud-btn" onClick={onResetRoom}>
           New room
+        </button>
+        <span className="hud-divider" />
+        <button type="button" className="hud-btn" onClick={toggleMute}>
+          {muted ? '🔇 Music' : '🔊 Music'}
         </button>
       </div>
     </div>
