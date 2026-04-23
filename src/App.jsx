@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { getDatabase, ref as dbRef, onValue, set, serverTimestamp } from 'firebase/database';
 import { firebaseApp } from './firebase.js';
 
@@ -1097,7 +1098,6 @@ function DrawingPad({ onCommit }) {
 // ---------------------------------------------------------------------------
 function HostView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
-  const [copied, setCopied] = useState(false);
   const [muted, setMuted] = useState(false);
   const audioRef = useRef(null);
   const participantCount = Object.keys(shared.participants).length;
@@ -1130,17 +1130,6 @@ function HostView({ room, shared, onResetRoom }) {
         <span className="hud-divider" />
         <span className="hud-count">{participantCount} joined</span>
         <span className="hud-divider" />
-        <button
-          type="button"
-          className="hud-btn"
-          onClick={async () => {
-            await navigator.clipboard.writeText(joinUrl);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1400);
-          }}
-        >
-          {copied ? 'Copied ✓' : 'Copy link'}
-        </button>
         <button type="button" className="hud-btn" onClick={shared.clearCanvas}>
           Clear
         </button>
@@ -1151,6 +1140,12 @@ function HostView({ room, shared, onResetRoom }) {
         <button type="button" className="hud-btn" onClick={toggleMute}>
           {muted ? '🔇 Music' : '🔊 Music'}
         </button>
+      </div>
+
+      <div className="qr-corner">
+        <div className="qr-label">Scan to join</div>
+        <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
+        <div className="qr-room">{room}</div>
       </div>
     </div>
   );
