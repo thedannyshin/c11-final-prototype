@@ -980,7 +980,9 @@ function DrawingPad({ onCommit }) {
     ctx.drawImage(oc, 0, 0, w, h);
   };
 
-  // One-time canvas setup — sets physical pixel size and scales context.
+  // One-time canvas setup — sets physical pixel size, scales context,
+  // and attaches native touch listeners with passive:false so
+  // preventDefault() actually works and stops scroll on mobile.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -993,6 +995,15 @@ function DrawingPad({ onCommit }) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctxRef.current = ctx;
     rebakeAndBlit();
+
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', end, { passive: false });
+    return () => {
+      canvas.removeEventListener('touchstart', start);
+      canvas.removeEventListener('touchmove', move);
+      canvas.removeEventListener('touchend', end);
+    };
   }, []);
 
   const getPoint = (event) => {
@@ -1099,9 +1110,6 @@ function DrawingPad({ onCommit }) {
           onMouseMove={move}
           onMouseUp={end}
           onMouseLeave={end}
-          onTouchStart={start}
-          onTouchMove={move}
-          onTouchEnd={end}
         />
       </div>
 
