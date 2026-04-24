@@ -1,0 +1,190 @@
+/* Battle Arena — game-specific styles
+   To delete the battle game: delete src/battle/ and remove its import from App.jsx */
+
+.battle-host-shell {
+  position: fixed;
+  inset: 0;
+  background: #020d1a;
+  overflow: hidden;
+}
+
+.battle-arena-wrap {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── Lobby overlay ─────────────────────────────────────────────────────────── */
+
+.battle-lobby-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 13, 26, 0.82);
+  backdrop-filter: blur(6px);
+  z-index: 20;
+}
+
+.battle-lobby-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 36px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  max-width: 680px;
+  width: 100%;
+}
+
+.battle-lobby-title {
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+  text-align: center;
+}
+
+.battle-qr-row {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.battle-qr-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.battle-qr-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.battle-qr-sub {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.battle-cam-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.battle-cam-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.battle-cam-select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  color: #fff;
+  padding: 4px 8px;
+  font-size: 0.8125rem;
+}
+
+.battle-start-btn {
+  background: linear-gradient(135deg, #F43F5E, #a21caf);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 12px 36px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.battle-start-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.battle-start-btn:not(:disabled):hover { opacity: 0.88; }
+
+/* ── Win overlay ───────────────────────────────────────────────────────────── */
+
+.battle-win-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 13, 26, 0.88);
+  backdrop-filter: blur(8px);
+  z-index: 30;
+}
+
+.battle-win-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.battle-win-emoji { font-size: 4rem; }
+
+.battle-win-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+/* ── Fingertip cursors ─────────────────────────────────────────────────────── */
+
+.battle-p1-cursor { border-color: #F43F5E; box-shadow: 0 0 14px #F43F5E; }
+.battle-p2-cursor { border-color: #00D4FF; box-shadow: 0 0 14px #00D4FF; }
+
+/* ── Participant — team selection buttons ─────────────────────────────────── */
+
+.battle-team-row {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+
+.battle-p1-btn {
+  background: #F43F5E;
+  color: #fff;
+  flex: 1;
+  border-radius: 999px;
+}
+
+.battle-p2-btn {
+  background: #00D4FF;
+  color: #0a1628;
+  flex: 1;
+  border-radius: 999px;
+}
+
+.battle-p1-btn:disabled, .battle-p2-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Sent confirmation ─────────────────────────────────────────────────────── */
+
+.battle-pad-sent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #fff;
+}
+
+.battle-sent-icon { font-size: 3.5rem; }
+.battle-sent-title { font-size: 1.4rem; font-weight: 700; }
+.battle-sent-sub { font-size: 0.9rem; color: rgba(255,255,255,0.55); }
+
+/* ── Home screen — battle button accent ───────────────────────────────────── */
+
+.battle-btn {
+  background: linear-gradient(135deg, #F43F5E, #a21caf) !important;
+}
