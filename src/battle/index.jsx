@@ -398,43 +398,138 @@ function drawSizeBars(ctx, p1Size, p2Size, W, H) {
 }
 
 // ---------------------------------------------------------------------------
+// PhoneController — runs on the player's phone after they've drawn their
+// creature. Uses the phone's front camera + MediaPipe to detect the
+// fingertip and sends normalised {x, y, pinch} to Firebase ~15 fps.
+// ---------------------------------------------------------------------------
+function PhoneController({ transport, slot }) {
+  const [tracking, setTracking] = useState(false);
+  const [fingertipPos, setFingertipPos] = useState(null);
+  const [pinching, setPinching] = useState(false);
+  const lastSendRef = useRef(0);
+
+  useEffect(() => {
+    let active = true;
+
+    async function init() {
+      try {
+        await loadMediaPipeHands();
+        if (!active) return;
+
+        const hands = new window.Hands({
+          locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
+        });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5 });
+
+        const smoothRef = { x: null, y: null };
+        const CAM_PAD_X = 0.22; const CAM_PAD_Y = 0.15; const SMOOTH = 0.5;
+
+        hands.onResults((results) => {
+          if (!active) return;
+          if (!results.multiHandLandmarks?.length) {
+            setFingertipPos(null);
+            smoothRef.x = null; smoothRef.y = null;
+            return;
+          }
+          const lm = results.multiHandLandmarks[0];
+          const tip = lm[8]; const thumb = lm[4];
+          const normX = Math.max(0, Math.min(1, ((1 - tip.x) - CAM_PAD_X) / (1 - 2 * CAM_PAD_X)));
+          const normY = Math.max(0, Math.min(1, (tip.y - CAM_PAD_Y) / (1 - 2 * CAM_PAD_Y)));
+          if (smoothRef.x === null) { smoothRef.x = normX; smoothRef.y = normY; }
+          else { smoothRef.x += (normX - smoothRef.x) * SMOOTH; smoothRef.y += (normY - smoothRef.y) * SMOOTH; }
+
+          const dx = (tip.x - thumb.x) * window.innerWidth;
+          const dy = (tip.y - thumb.y) * window.innerHeight;
+          const isPinching = Math.sqrt(dx * dx + dy * dy) < 55;
+
+          setFingertipPos({ x: smoothRef.x, y: smoothRef.y });
+          setPinching(isPinching);
+
+          // Throttle Firebase writes to ~15 fps
+          const now = Date.now();
+          if (now - lastSendRef.current >= 66) {
+            lastSendRef.current = now;
+            transport.sendControl(slot, { x: smoothRef.x, y: smoothRef.y, pinch: isPinching });
+          }
+        });
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480, facingMode: 'user' },
+        });
+        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
+
+        const video = document.createElement('video');
+        video.srcObject = stream; video.playsInline = true;
+        await video.play();
+        setTracking(true);
+
+        let rafId;
+        const loop = async () => {
+          if (!active) return;
+          if (video.readyState >= 2) await hands.send({ image: video });
+          rafId = requestAnimationFrame(loop);
+        };
+        rafId = requestAnimationFrame(loop);
+
+        return () => { active = false; cancelAnimationFrame(rafId); stream.getTracks().forEach((t) => t.stop()); };
+      } catch (err) { console.warn('PhoneController error:', err); }
+    }
+
+    const cleanupPromise = init();
+    return () => { active = false; cleanupPromise.then((c) => c?.()); };
+  }, [transport, slot]);
+
+  const col = slot === 'p1' ? P1_COLOR : P2_COLOR;
+  const label = slot === 'p1' ? '🔴 Player 1' : '🔵 Player 2';
+
+  return (
+    <div className="phone-controller">
+      <div className="phone-ctrl-badge" style={{ color: col }}>{label}</div>
+      {!tracking && <div className="phone-ctrl-loading">Starting camera…</div>}
+      {tracking && (
+        <>
+          <div className={`phone-ctrl-status ${pinching ? 'is-pinching' : ''}`} style={{ borderColor: col }}>
+            {fingertipPos ? (
+              <div className="phone-ctrl-dot" style={{
+                left: `${fingertipPos.x * 100}%`,
+                top: `${fingertipPos.y * 100}%`,
+                background: col,
+                boxShadow: `0 0 16px ${col}`,
+              }} />
+            ) : (
+              <span className="phone-ctrl-no-hand">Hold up your hand ✋</span>
+            )}
+          </div>
+          <p className="phone-ctrl-hint">Move your index finger to steer.<br />Pinch to shoot.</p>
+          {pinching && <div className="phone-ctrl-shoot-flash" style={{ background: col }}>💥 SHOOT</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // BattleHostView — lobby + game loop + win screen
+// Players use their phones as controllers — positions arrive via Firebase.
 // ---------------------------------------------------------------------------
 export function BattleHostView({ room, clientId, onResetRoom }) {
   const transport = useMemo(() => createBattleTransport(room), [room]);
 
-  // Firebase state
   const [players, setPlayers] = useState({ p1: null, p2: null });
   const [food, setFood] = useState([]);
-  const [gamePhase, setGamePhase] = useState('lobby'); // lobby | playing | ended
+  const [gamePhase, setGamePhase] = useState('lobby');
   const [winner, setWinner] = useState(null);
+  // Live cursor dots for each player (normalised 0-1)
+  const [p1Cursor, setP1Cursor] = useState(null);
+  const [p2Cursor, setP2Cursor] = useState(null);
 
-  // Game state refs (updated every frame, not React state)
   const p1Ref = useRef({ creature: null, x: 0.25, y: 0.5, size: BASE_SIZE });
   const p2Ref = useRef({ creature: null, x: 0.75, y: 0.5, size: BASE_SIZE });
   const foodRef = useRef([]);
   const projectilesRef = useRef([]);
-  const bgRef = useRef(generateBg()); // generate eagerly so GameArena sees it on first resize
-
-  // Webcam device selection
-  const [videoDevices, setVideoDevices] = useState([]);
-  const [p1DeviceId, setP1DeviceId] = useState('');
-  const [p2DeviceId, setP2DeviceId] = useState('');
-  const [handEnabled, setHandEnabled] = useState(false);
-
+  const bgRef = useRef(generateBg());
   const lastShot = useRef({ p1: 0, p2: 0 });
-
-  // Fingertip tracking for both players
-  const { fingertipPos: fp1, pinchCbRef: pinch1 } = useHandTracking(handEnabled, p1DeviceId || null);
-  const { fingertipPos: fp2, pinchCbRef: pinch2 } = useHandTracking(handEnabled, p2DeviceId || null);
-
-
-  // Enumerate cameras
-  useEffect(() => {
-    navigator.mediaDevices.enumerateDevices().then((devices) => {
-      setVideoDevices(devices.filter((d) => d.kind === 'videoinput'));
-    });
-  }, []);
+  const prevPinch = useRef({ p1: false, p2: false });
 
   // Firebase subscriptions
   useEffect(() => {
@@ -450,114 +545,85 @@ export function BattleHostView({ room, clientId, onResetRoom }) {
       if (state.phase) setGamePhase(state.phase);
       if (state.winner) { setWinner(state.winner); setGamePhase('ended'); }
     });
+    // Phone controller positions
+    transport.onControl((ctrl) => {
+      for (const slot of ['p1', 'p2']) {
+        const data = ctrl[slot];
+        if (!data) continue;
+        const pRef = slot === 'p1' ? p1Ref : p2Ref;
+        pRef.current.x = Math.max(0.02, Math.min(0.98, data.x ?? pRef.current.x));
+        pRef.current.y = Math.max(0.02, Math.min(0.98, data.y ?? pRef.current.y));
+        if (slot === 'p1') setP1Cursor({ x: data.x, y: data.y });
+        else setP2Cursor({ x: data.x, y: data.y });
+
+        // Pinch → shoot (detect rising edge)
+        if (data.pinch && !prevPinch.current[slot] && gamePhase === 'playing') {
+          const now = Date.now();
+          if (now - lastShot.current[slot] >= SHOOT_COOLDOWN) {
+            lastShot.current[slot] = now;
+            const src = slot === 'p1' ? p1Ref.current : p2Ref.current;
+            const tgt = slot === 'p1' ? p2Ref.current : p1Ref.current;
+            const dx = tgt.x - src.x; const dy = tgt.y - src.y;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            projectilesRef.current = [...projectilesRef.current, {
+              id: crypto.randomUUID(), x: src.x, y: src.y,
+              vx: (dx / len) * PROJECTILE_SPEED, vy: (dy / len) * PROJECTILE_SPEED,
+              owner: slot,
+            }];
+          }
+        }
+        prevPinch.current[slot] = data.pinch;
+      }
+    });
     return () => transport.destroy();
   }, [transport]);
 
-  // Sync food ref
+  // Note: gamePhase is captured at subscription time; use a ref to keep it fresh
+  const gamePhaseRef = useRef(gamePhase);
+  useEffect(() => { gamePhaseRef.current = gamePhase; }, [gamePhase]);
+
   useEffect(() => { foodRef.current = food; }, [food]);
 
-  // Move player 1 creature to follow fingertip
-  useEffect(() => {
-    if (!fp1) return;
-    p1Ref.current.x = Math.max(0.02, Math.min(0.98, fp1.x / window.innerWidth));
-    p1Ref.current.y = Math.max(0.02, Math.min(0.98, fp1.y / window.innerHeight));
-  }, [fp1]);
-
-  // Move player 2 creature to follow fingertip
-  useEffect(() => {
-    if (!fp2) return;
-    p2Ref.current.x = Math.max(0.02, Math.min(0.98, fp2.x / window.innerWidth));
-    p2Ref.current.y = Math.max(0.02, Math.min(0.98, fp2.y / window.innerHeight));
-  }, [fp2]);
-
-  // Shoot on pinch for P1
-  useEffect(() => {
-    pinch1.current.onStart = () => {
-      if (gamePhase !== 'playing') return;
-      const now = Date.now();
-      if (now - lastShot.current.p1 < SHOOT_COOLDOWN) return;
-      lastShot.current.p1 = now;
-      const p1 = p1Ref.current; const p2 = p2Ref.current;
-      const dx = p2.x - p1.x; const dy = p2.y - p1.y;
-      const len = Math.sqrt(dx * dx + dy * dy) || 1;
-      projectilesRef.current = [...projectilesRef.current, {
-        id: crypto.randomUUID(), x: p1.x, y: p1.y,
-        vx: (dx / len) * PROJECTILE_SPEED, vy: (dy / len) * PROJECTILE_SPEED,
-        owner: 'p1',
-      }];
-    };
-  }, [gamePhase]);
-
-  // Shoot on pinch for P2
-  useEffect(() => {
-    pinch2.current.onStart = () => {
-      if (gamePhase !== 'playing') return;
-      const now = Date.now();
-      if (now - lastShot.current.p2 < SHOOT_COOLDOWN) return;
-      lastShot.current.p2 = now;
-      const p1 = p1Ref.current; const p2 = p2Ref.current;
-      const dx = p1.x - p2.x; const dy = p1.y - p2.y;
-      const len = Math.sqrt(dx * dx + dy * dy) || 1;
-      projectilesRef.current = [...projectilesRef.current, {
-        id: crypto.randomUUID(), x: p2.x, y: p2.y,
-        vx: (dx / len) * PROJECTILE_SPEED, vy: (dy / len) * PROJECTILE_SPEED,
-        owner: 'p2',
-      }];
-    };
-  }, [gamePhase]);
-
-  // Game loop — runs when playing
+  // Game loop
   useEffect(() => {
     if (gamePhase !== 'playing') return;
-    let rafId;
-    let foodPhase = 0;
+    let rafId; let foodPhase = 0;
 
     const tick = () => {
       rafId = requestAnimationFrame(tick);
       foodPhase += 0.01;
 
-      // Drift food items gently
       foodRef.current = foodRef.current.map((f, i) => ({
         ...f,
         x: f.x + Math.sin(foodPhase + i * 1.3) * FOOD_DRIFT,
         y: f.y + Math.cos(foodPhase * 0.7 + i * 0.9) * FOOD_DRIFT * 0.6,
       }));
 
-      // Advance projectiles
       projectilesRef.current = projectilesRef.current
         .map((p) => ({ ...p, x: p.x + p.vx, y: p.y + p.vy }))
         .filter((p) => p.x > 0 && p.x < 1 && p.y > 0 && p.y < 1);
 
-      // Collision: projectile hits a player
       const surviving = [];
       for (const proj of projectilesRef.current) {
         const target = proj.owner === 'p1' ? p2Ref.current : p1Ref.current;
         const dx = proj.x - target.x; const dy = proj.y - target.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < target.size * 0.6) {
+        if (Math.sqrt(dx * dx + dy * dy) < target.size * 0.6) {
           target.size = Math.max(MIN_SIZE, target.size - HIT_SHRINK);
-        } else {
-          surviving.push(proj);
-        }
+        } else { surviving.push(proj); }
       }
       projectilesRef.current = surviving;
 
-      // Collision: player walks over their own food
       const remainingFood = [];
       for (const f of foodRef.current) {
         const player = f.team === 'p1' ? p1Ref.current : p2Ref.current;
         const dx = f.x - player.x; const dy = f.y - player.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < player.size * 0.7 + FOOD_RADIUS) {
+        if (Math.sqrt(dx * dx + dy * dy) < player.size * 0.7 + FOOD_RADIUS) {
           player.size = Math.min(MAX_SIZE, player.size + FOOD_GROW);
           transport.removeFood(f.id);
-        } else {
-          remainingFood.push(f);
-        }
+        } else { remainingFood.push(f); }
       }
       foodRef.current = remainingFood;
 
-      // Win check
       if (p1Ref.current.size <= MIN_SIZE) {
         transport.setGameState({ phase: 'ended', winner: 'p2' });
         setWinner('p2'); setGamePhase('ended');
@@ -576,19 +642,14 @@ export function BattleHostView({ room, clientId, onResetRoom }) {
     projectilesRef.current = [];
     transport.setGameState({ phase: 'playing', winner: null });
     setGamePhase('playing');
-    setHandEnabled(true);
   };
 
   const resetGame = () => {
     transport.resetRoom();
-    setPlayers({ p1: null, p2: null });
-    setFood([]);
-    setGamePhase('lobby');
-    setWinner(null);
+    setPlayers({ p1: null, p2: null }); setFood([]); setGamePhase('lobby'); setWinner(null);
     projectilesRef.current = [];
     p1Ref.current = { creature: null, x: 0.25, y: 0.5, size: BASE_SIZE };
     p2Ref.current = { creature: null, x: 0.75, y: 0.5, size: BASE_SIZE };
-    setHandEnabled(false);
     onResetRoom?.();
   };
 
@@ -599,27 +660,24 @@ export function BattleHostView({ room, clientId, onResetRoom }) {
 
   return (
     <div className="battle-host-shell">
-      {/* Arena canvas — always rendered */}
       <div className="battle-arena-wrap">
         <GameArena bgRef={bgRef} p1Ref={p1Ref} p2Ref={p2Ref} foodRef={foodRef} projectilesRef={projectilesRef} />
       </div>
 
-      {/* Lobby overlay */}
       {gamePhase === 'lobby' && (
         <div className="battle-lobby-overlay">
           <div className="battle-lobby-card">
             <h2 className="battle-lobby-title">Battle Arena — Room {room}</h2>
-
             <div className="battle-qr-row">
               <div className="battle-qr-item">
                 <div className="battle-qr-label" style={{ color: P1_COLOR }}>🔴 Player 1</div>
                 <QRCodeSVG value={p1JoinUrl} size={120} bgColor="transparent" fgColor={P1_COLOR} />
-                <div className="battle-qr-sub">{players?.p1?.ready ? '✓ Ready' : 'Scan to join & draw'}</div>
+                <div className="battle-qr-sub">{players?.p1?.ready ? '✓ Ready' : 'Scan · draw · control'}</div>
               </div>
               <div className="battle-qr-item">
                 <div className="battle-qr-label" style={{ color: P2_COLOR }}>🔵 Player 2</div>
                 <QRCodeSVG value={p2JoinUrl} size={120} bgColor="transparent" fgColor={P2_COLOR} />
-                <div className="battle-qr-sub">{players?.p2?.ready ? '✓ Ready' : 'Scan to join & draw'}</div>
+                <div className="battle-qr-sub">{players?.p2?.ready ? '✓ Ready' : 'Scan · draw · control'}</div>
               </div>
               <div className="battle-qr-item">
                 <div className="battle-qr-label" style={{ color: '#fff' }}>🍖 Send food</div>
@@ -627,36 +685,14 @@ export function BattleHostView({ room, clientId, onResetRoom }) {
                 <div className="battle-qr-sub">Draw food, pick a side</div>
               </div>
             </div>
-
-            {videoDevices.length > 1 && (
-              <div className="battle-cam-row">
-                <label className="battle-cam-label">P1 webcam:
-                  <select value={p1DeviceId} onChange={(e) => setP1DeviceId(e.target.value)} className="battle-cam-select">
-                    {videoDevices.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 12)}</option>)}
-                  </select>
-                </label>
-                <label className="battle-cam-label">P2 webcam:
-                  <select value={p2DeviceId} onChange={(e) => setP2DeviceId(e.target.value)} className="battle-cam-select">
-                    {videoDevices.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 12)}</option>)}
-                  </select>
-                </label>
-              </div>
-            )}
-
-            <button
-              type="button"
-              className="button battle-start-btn"
-              onClick={startGame}
-              disabled={!bothReady}
-              title={bothReady ? '' : 'Waiting for both players to join'}
-            >
+            <button type="button" className="button battle-start-btn" onClick={startGame}
+              disabled={!bothReady} title={bothReady ? '' : 'Waiting for both players'}>
               {bothReady ? '⚔️ Start Battle' : 'Waiting for players…'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Win screen */}
       {gamePhase === 'ended' && (
         <div className="battle-win-overlay">
           <div className="battle-win-card">
@@ -669,23 +705,29 @@ export function BattleHostView({ room, clientId, onResetRoom }) {
         </div>
       )}
 
-      {/* Fingertip cursors */}
-      {fp1 && handEnabled && <div className="fingertip-cursor battle-p1-cursor" style={{ transform: `translate(calc(${fp1.x}px - 50%), calc(${fp1.y}px - 50%))` }} />}
-      {fp2 && handEnabled && <div className="fingertip-cursor battle-p2-cursor" style={{ transform: `translate(calc(${fp2.x}px - 50%), calc(${fp2.y}px - 50%))` }} />}
+      {/* Live cursor dots driven by phone positions */}
+      {p1Cursor && gamePhase === 'playing' && (
+        <div className="fingertip-cursor battle-p1-cursor" style={{ transform: `translate(calc(${p1Cursor.x * 100}vw - 50%), calc(${p1Cursor.y * 100}vh - 50%))` }} />
+      )}
+      {p2Cursor && gamePhase === 'playing' && (
+        <div className="fingertip-cursor battle-p2-cursor" style={{ transform: `translate(calc(${p2Cursor.x * 100}vw - 50%), calc(${p2Cursor.y * 100}vh - 50%))` }} />
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// BattleParticipantView — draw creature or food, pick team
+// BattleParticipantView — draw creature or food, then control via camera
 // ---------------------------------------------------------------------------
 export function BattleParticipantView({ room, clientId, team }) {
   const transport = useMemo(() => createBattleTransport(room), [room]);
   const isPlayer = team === 'p1' || team === 'p2';
+  const [controlling, setControlling] = useState(false);
 
   const handleCommit = (character, assignedTeam) => {
     if (isPlayer) {
       transport.setPlayerCreature(team, character);
+      setControlling(true); // switch to camera controller mode
     } else {
       transport.submitFood({
         ...character,
@@ -696,12 +738,18 @@ export function BattleParticipantView({ room, clientId, team }) {
     }
   };
 
+  if (isPlayer && controlling) {
+    return <PhoneController transport={transport} slot={team} />;
+  }
+
   return (
     <div className="participant-shell">
       <div className="participant-header">
         <span className="pill">Room {room}</span>
         <span className="muted-text" style={{ fontSize: '0.8125rem' }}>
-          {isPlayer ? `You are ${team === 'p1' ? '🔴 Player 1' : '🔵 Player 2'} — draw your creature` : 'Draw food — pick a side to give it to'}
+          {isPlayer
+            ? `You are ${team === 'p1' ? '🔴 Player 1' : '🔵 Player 2'} — draw your creature`
+            : 'Draw food — pick a side to give it to'}
         </span>
       </div>
       <BattleDrawingPad onCommit={handleCommit} isPlayer={isPlayer} playerSlot={team} />

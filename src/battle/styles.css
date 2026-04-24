@@ -188,3 +188,86 @@
 .battle-btn {
   background: linear-gradient(135deg, #F43F5E, #a21caf) !important;
 }
+
+/* ── Phone controller — shown on player's phone after drawing ─────────────── */
+
+.phone-controller {
+  min-height: 100dvh;
+  background: #020d1a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  color: #fff;
+}
+
+.phone-ctrl-badge {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.phone-ctrl-loading {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.9rem;
+}
+
+/* 2-D tracking preview box */
+.phone-ctrl-status {
+  position: relative;
+  width: min(72vw, 280px);
+  aspect-ratio: 1;
+  border: 2px solid rgba(255,255,255,0.18);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.04);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.phone-ctrl-status.is-pinching {
+  border-color: rgba(255,255,255,0.7);
+  box-shadow: 0 0 24px rgba(255,255,255,0.15);
+}
+
+.phone-ctrl-dot {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: left 0.04s linear, top 0.04s linear;
+}
+
+.phone-ctrl-no-hand {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.35);
+  font-size: 0.85rem;
+}
+
+.phone-ctrl-hint {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.45);
+  text-align: center;
+  line-height: 1.6;
+  max-width: 240px;
+}
+
+.phone-ctrl-shoot-flash {
+  padding: 6px 20px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #fff;
+  animation: shootPop 0.4s ease-out forwards;
+}
+
+@keyframes shootPop {
+  0%   { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.4); }
+}

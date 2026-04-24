@@ -44,6 +44,16 @@ export function createBattleTransport(roomId) {
     setGameState(state) {
       update(ref(db, `${base}/gameState`), state);
     },
+    // ── phone controller — real-time fingertip position + pinch ────────────
+    // Throttle writes on the caller side to ~15 fps (every 66 ms).
+    sendControl(slot, payload) {
+      // payload: { x, y, pinch: bool }
+      set(ref(db, `${base}/control/${slot}`), payload);
+    },
+    onControl(cb) {
+      watchPath(`${base}/control`, 'control', (val) => cb(val || {}));
+    },
+
     resetRoom() {
       set(ref(db, base), null);
     },
