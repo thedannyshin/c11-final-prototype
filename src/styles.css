@@ -307,17 +307,6 @@ p {
   user-select: none;
 }
 
-.hud-room {
-  font-size: 0.8125rem;
-  color: rgba(255, 255, 255, 0.5);
-  letter-spacing: 0.01em;
-}
-
-.hud-room strong {
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 600;
-}
-
 .hud-count {
   font-size: 0.8125rem;
   color: rgba(255, 255, 255, 0.45);

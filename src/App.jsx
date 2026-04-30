@@ -1204,10 +1204,6 @@ function HostView({ room, shared, onResetRoom }) {
       </div>
 
       <div className="host-hud">
-        <span className="hud-room">
-          <strong>{room}</strong>
-        </span>
-        <span className="hud-divider" />
         <div className="hud-field">
           <select
             className="hud-select"
