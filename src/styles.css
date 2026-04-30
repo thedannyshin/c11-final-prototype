@@ -288,6 +288,18 @@ p {
   overflow: hidden;
 }
 
+.host-fullscreen:fullscreen {
+  width: 100%;
+  height: 100%;
+  background: #050e18;
+}
+
+.host-fullscreen:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+  background: #050e18;
+}
+
 .host-hud {
   position: absolute;
   top: 20px;

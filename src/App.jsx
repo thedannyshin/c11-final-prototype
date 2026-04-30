@@ -32,6 +32,21 @@ function normalizeRoomBackground(v) {
   return 'water';
 }
 
+function getBrowserFullscreenElement() {
+  return document.fullscreenElement ?? document.webkitFullscreenElement ?? null;
+}
+
+async function requestBrowserFullscreen(el) {
+  if (!el) return;
+  if (typeof el.requestFullscreen === 'function') await el.requestFullscreen();
+  else if (typeof el.webkitRequestFullscreen === 'function') await el.webkitRequestFullscreen();
+}
+
+async function exitBrowserFullscreen() {
+  if (typeof document.exitFullscreen === 'function') await document.exitFullscreen();
+  else if (typeof document.webkitExitFullscreen === 'function') await document.webkitExitFullscreen();
+}
+
 function drawCoverImage(ctx, img, destW, destH) {
   if (!img?.naturalWidth) return false;
   const iw = img.naturalWidth;
@@ -1114,6 +1129,21 @@ function HostView({ room, shared, onResetRoom }) {
   });
   const [videoInputs, setVideoInputs] = useState([]);
   const audioRef = useRef(null);
+  const hostRootRef = useRef(null);
+  const [hostFullscreen, setHostFullscreen] = useState(false);
+
+  useEffect(() => {
+    const sync = () => {
+      const el = getBrowserFullscreenElement();
+      setHostFullscreen(!!hostRootRef.current && el === hostRootRef.current);
+    };
+    document.addEventListener('fullscreenchange', sync);
+    document.addEventListener('webkitfullscreenchange', sync);
+    return () => {
+      document.removeEventListener('fullscreenchange', sync);
+      document.removeEventListener('webkitfullscreenchange', sync);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -1261,10 +1291,21 @@ function HostView({ room, shared, onResetRoom }) {
     else { audio.volume = 0.4; audio.play().catch(() => {}); setPlaying(true); }
   };
 
+  const toggleHostFullscreen = useCallback(async () => {
+    const root = hostRootRef.current;
+    if (!root) return;
+    try {
+      if (getBrowserFullscreenElement() === root) await exitBrowserFullscreen();
+      else await requestBrowserFullscreen(root);
+    } catch (err) {
+      console.warn('Fullscreen:', err);
+    }
+  }, []);
+
   const visibleStrokes = shared.strokes.filter((s) => !hiddenIds.has(s.id));
 
   return (
-    <div className="host-fullscreen">
+    <div className="host-fullscreen" ref={hostRootRef}>
       <audio ref={audioRef} loop preload="metadata" />
 
       <div className="host-layout">
@@ -1293,6 +1334,10 @@ function HostView({ room, shared, onResetRoom }) {
       <div className="host-hud">
         <button type="button" className="hud-btn" onClick={onResetRoom}>
           New room
+        </button>
+        <span className="hud-divider" />
+        <button type="button" className="hud-btn" onClick={toggleHostFullscreen}>
+          {hostFullscreen ? 'Exit full screen' : 'Full screen'}
         </button>
         <span className="hud-divider" />
         <button type="button" className="hud-btn" onClick={toggleMusic}>
