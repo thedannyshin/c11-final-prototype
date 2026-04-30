@@ -354,12 +354,6 @@ p {
 .hud-field {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-}
-
-.hud-field-label {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.4);
 }
 
 .hud-select {

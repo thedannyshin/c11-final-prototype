@@ -1204,15 +1204,16 @@ function HostView({ room, shared, onResetRoom }) {
       </div>
 
       <div className="host-hud">
-        <span className="hud-room">Room&nbsp;<strong>{room}</strong></span>
+        <span className="hud-room">
+          <strong>{room}</strong>
+        </span>
         <span className="hud-divider" />
-        <label className="hud-field">
-          <span className="hud-field-label">Background</span>
+        <div className="hud-field">
           <select
             className="hud-select"
             value={hostScene}
             onChange={(e) => setHostScene(e.target.value)}
-            aria-label="Background scene"
+            aria-label="Scene style"
           >
             {HOST_SCENE_OPTIONS.map(({ id, label }) => (
               <option key={id} value={id}>
@@ -1220,7 +1221,7 @@ function HostView({ room, shared, onResetRoom }) {
               </option>
             ))}
           </select>
-        </label>
+        </div>
         <span className="hud-divider" />
         <button type="button" className="hud-btn" onClick={onResetRoom}>
           New room
