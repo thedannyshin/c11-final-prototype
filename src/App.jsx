@@ -1326,21 +1326,21 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
     <div className="participant-shell">
       <div className="participant-header">
         <span className="pill">Room {room}</span>
-        <span className="muted-text" style={{ fontSize: '0.8125rem' }}>Draw your creature</span>
-      </div>
-      <div className="participant-scene-row">
-        <select
-          className="participant-scene-select"
-          value={shared.roomBackground}
-          onChange={(e) => shared.setRoomBackground(e.target.value)}
-          aria-label="Big screen background"
-        >
-          {HOST_SCENE_OPTIONS.map(({ id, label }) => (
-            <option key={id} value={id}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <div className="participant-scene-wrap">
+          <select
+            className="participant-scene-select"
+            value={shared.roomBackground}
+            onChange={(e) => shared.setRoomBackground(e.target.value)}
+            aria-label="Big screen background"
+            title="Change the big screen background"
+          >
+            {HOST_SCENE_OPTIONS.map(({ id, label }) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <DrawingPad onCommit={shared.addCharacter} />
     </div>
