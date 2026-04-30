@@ -13,7 +13,7 @@ function mainAquariumWidthPx() {
   return window.innerWidth * (1 - SHOWCASE_WIDTH_FRAC);
 }
 
-/** Host screen background art (see /public/bg-*.png). Water uses gradient-only in canvas (bitmap has painted bubbles). */
+/** Host screen background art (see /public/bg-*.png). */
 const HOST_BG_BY_SCENE = {
   water: '/bg-water.png',
   grass: '/bg-grass.png',
@@ -587,7 +587,6 @@ function AquariumCanvas({
 
   useEffect(() => {
     Object.entries(HOST_BG_BY_SCENE).forEach(([id, src]) => {
-      if (id === 'water') return;
       if (bgImgBySceneRef.current[id]?.complete) return;
       const img = new Image();
       img.src = src;
@@ -656,9 +655,10 @@ function AquariumCanvas({
       const H = canvas.height;
 
       const scene = sceneRef.current;
-      const bgImg = scene === 'water' ? null : bgImgBySceneRef.current[scene];
+      const bgImg = bgImgBySceneRef.current[scene];
+      const drewBg = drawCoverImage(ctx, bgImg, W, H);
 
-      if (!drawCoverImage(ctx, bgImg, W, H)) {
+      if (!drewBg) {
         const fall = ctx.createLinearGradient(0, 0, 0, H);
         fall.addColorStop(0, '#142238');
         fall.addColorStop(1, '#080c14');
@@ -666,13 +666,16 @@ function AquariumCanvas({
         ctx.fillRect(0, 0, W, H);
       }
 
-      const vign = ctx.createLinearGradient(0, H * 0.5, 0, H);
-      vign.addColorStop(0, 'rgba(0,0,0,0)');
-      vign.addColorStop(1, 'rgba(5,10,22,0.45)');
-      ctx.fillStyle = vign;
-      ctx.fillRect(0, H * 0.52, W, H * 0.48);
+      if (!(scene === 'water' && drewBg)) {
+        const vign = ctx.createLinearGradient(0, H * 0.5, 0, H);
+        vign.addColorStop(0, 'rgba(0,0,0,0)');
+        vign.addColorStop(1, 'rgba(5,10,22,0.45)');
+        ctx.fillStyle = vign;
+        ctx.fillRect(0, H * 0.52, W, H * 0.48);
+      }
 
-      if (scene === 'water') {
+      // Extra water washes were for empty gradient only; skip when art is showing.
+      if (scene === 'water' && !drewBg) {
         const floor = ctx.createLinearGradient(0, H * 0.82, 0, H);
         floor.addColorStop(0, 'rgba(5, 14, 24, 0)');
         floor.addColorStop(1, 'rgba(5, 14, 24, 0.5)');
@@ -792,12 +795,20 @@ function SideAquarium({ creatures, onReleaseAll, scene = 'water' }) {
     const src = HOST_BG_BY_SCENE[scene] || HOST_BG_BY_SCENE.water;
 
     const paint = (img) => {
-      if (scene !== 'water' && img && drawCoverImage(ctx, img, W, H)) {
-        const v = ctx.createLinearGradient(0, H * 0.45, 0, H);
-        v.addColorStop(0, 'rgba(0,0,0,0)');
-        v.addColorStop(1, 'rgba(5,10,22,0.55)');
-        ctx.fillStyle = v;
-        ctx.fillRect(0, H * 0.4, W, H * 0.6);
+      if (img && drawCoverImage(ctx, img, W, H)) {
+        if (scene === 'water') {
+          const v = ctx.createLinearGradient(0, H * 0.5, 0, H);
+          v.addColorStop(0, 'rgba(0,0,0,0)');
+          v.addColorStop(1, 'rgba(5,10,22,0.22)');
+          ctx.fillStyle = v;
+          ctx.fillRect(0, H * 0.45, W, H * 0.55);
+        } else {
+          const v = ctx.createLinearGradient(0, H * 0.45, 0, H);
+          v.addColorStop(0, 'rgba(0,0,0,0)');
+          v.addColorStop(1, 'rgba(5,10,22,0.55)');
+          ctx.fillStyle = v;
+          ctx.fillRect(0, H * 0.4, W, H * 0.6);
+        }
       } else {
         const bg = ctx.createLinearGradient(0, 0, 0, H);
         bg.addColorStop(0, '#0a1a30');
@@ -821,11 +832,6 @@ function SideAquarium({ creatures, onReleaseAll, scene = 'water' }) {
         ctx.restore();
       });
     };
-
-    if (scene === 'water') {
-      paint(null);
-      return;
-    }
 
     const img = new Image();
     let cancelled = false;
