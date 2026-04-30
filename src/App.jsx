@@ -96,6 +96,15 @@ function HudIconMusicPause() {
   );
 }
 
+function HudIconWebcam() {
+  return (
+    <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  );
+}
+
 function drawCoverImage(ctx, img, destW, destH) {
   if (!img?.naturalWidth) return false;
   const iw = img.naturalWidth;
@@ -1411,9 +1420,12 @@ function HostView({ room, shared, onResetRoom }) {
           {playing ? <HudIconMusicPause /> : <HudIconMusicPlay />}
         </button>
         <span className="hud-divider" />
-        <div className="hud-field">
+        <div className="hud-camera-wrap" title="Choose webcam for hand tracking">
+          <span className="hud-camera-icon">
+            <HudIconWebcam />
+          </span>
           <select
-            className="hud-select hud-select--camera"
+            className="hud-select hud-select--camera-icon"
             value={cameraDeviceId}
             onChange={(e) => setCameraDeviceId(e.target.value)}
             aria-label="Webcam for hand tracking"
