@@ -342,6 +342,20 @@ p {
   transition: color 0.15s, background 0.15s;
 }
 
+.hud-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  min-width: 36px;
+  min-height: 36px;
+}
+
+.hud-icon-svg {
+  display: block;
+  flex-shrink: 0;
+}
+
 .hud-btn:hover {
   color: rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.08);
