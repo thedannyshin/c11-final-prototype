@@ -79,6 +79,23 @@ function HudIconFullscreenExit() {
   );
 }
 
+function HudIconMusicPlay() {
+  return (
+    <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+      <path d="M8 5.5v13L18.5 12 8 5.5z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function HudIconMusicPause() {
+  return (
+    <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+      <rect x="7" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
+      <rect x="13" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+
 function drawCoverImage(ctx, img, destW, destH) {
   if (!img?.naturalWidth) return false;
   const iw = img.naturalWidth;
@@ -1384,8 +1401,14 @@ function HostView({ room, shared, onResetRoom }) {
           {hostFullscreen ? <HudIconFullscreenExit /> : <HudIconFullscreenEnter />}
         </button>
         <span className="hud-divider" />
-        <button type="button" className="hud-btn" onClick={toggleMusic}>
-          {playing ? '⏸ Music' : '▶ Music'}
+        <button
+          type="button"
+          className="hud-btn hud-btn--icon"
+          onClick={toggleMusic}
+          aria-label={playing ? 'Pause music' : 'Play music'}
+          title={playing ? 'Pause music' : 'Play music'}
+        >
+          {playing ? <HudIconMusicPause /> : <HudIconMusicPlay />}
         </button>
         <span className="hud-divider" />
         <div className="hud-field">
