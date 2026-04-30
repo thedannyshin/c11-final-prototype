@@ -215,37 +215,23 @@ function loadMediaPipeHands() {
 
 // ---------------------------------------------------------------------------
 // useHandTracking — webcam + MediaPipe, calls onStart/onEnd via pinchCbRef.
-// enabled — turn capture on/off
-// videoDeviceId — empty string = browser default (facingMode user); else exact device
-// Returns { fingertipPos, pinchCbRef } where pinchCbRef.current = { onStart, onEnd }.
+// cameraDeviceId — empty string = browser default (facingMode user when applicable).
 // ---------------------------------------------------------------------------
-function useHandTracking(enabled, videoDeviceId = '') {
+function useHandTracking(enabled, cameraDeviceId = '') {
   const [fingertipPos, setFingertipPos] = useState(null);
   const pinchCbRef = useRef({ onStart: null, onEnd: null });
   const prevPinchRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled) {
-      setFingertipPos(null);
-      if (prevPinchRef.current) {
-        prevPinchRef.current = false;
-        pinchCbRef.current.onEnd?.(null);
-      }
-      return undefined;
-    }
+    if (!enabled) { setFingertipPos(null); return; }
+    let active = true;
 
-    let disposed = false;
-    let stream = null;
-    let video = null;
-    let hands = null;
-    let rafId = 0;
-
-    async function run() {
+    async function init() {
       try {
         await loadMediaPipeHands();
-        if (disposed) return;
+        if (!active) return;
 
-        hands = new window.Hands({
+        const hands = new window.Hands({
           locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
         });
         hands.setOptions({
@@ -258,7 +244,7 @@ function useHandTracking(enabled, videoDeviceId = '') {
         const SMOOTH = 0.5; // lerp factor: lower = smoother but laggier
 
         hands.onResults((results) => {
-          if (disposed) return;
+          if (!active) return;
           if (!results.multiHandLandmarks?.length) {
             setFingertipPos(null);
             smoothRef.x = null;
@@ -272,12 +258,16 @@ function useHandTracking(enabled, videoDeviceId = '') {
           const lm = results.multiHandLandmarks[0];
           const tip = lm[8];   // index fingertip
           const thumb = lm[4]; // thumb tip
-          const CAM_PAD_X = 0.22;
-          const CAM_PAD_Y = 0.15;
+          // Mirror x so it matches the user's perspective.
+          // Remap a centred 55% band of the camera frame to the full screen so
+          // the user doesn't have to move their hand to the very edge of frame.
+          const CAM_PAD_X = 0.22;  // ignore outer 22% on each side horizontally
+          const CAM_PAD_Y = 0.15;  // ignore outer 15% on each side vertically
           const normX = Math.max(0, Math.min(1, ((1 - tip.x) - CAM_PAD_X) / (1 - 2 * CAM_PAD_X)));
           const normY = Math.max(0, Math.min(1, (tip.y - CAM_PAD_Y) / (1 - 2 * CAM_PAD_Y)));
           const rawX = normX * window.innerWidth;
           const rawY = normY * window.innerHeight;
+          // Exponential smoothing to reduce jitter
           if (smoothRef.x === null) { smoothRef.x = rawX; smoothRef.y = rawY; }
           else { smoothRef.x += (rawX - smoothRef.x) * SMOOTH; smoothRef.y += (rawY - smoothRef.y) * SMOOTH; }
           const sx = smoothRef.x;
@@ -293,53 +283,52 @@ function useHandTracking(enabled, videoDeviceId = '') {
           prevPinchRef.current = pinching;
         });
 
-        const videoConstraints = {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-        };
-        if (videoDeviceId) {
-          videoConstraints.deviceId = { exact: videoDeviceId };
-        } else {
-          videoConstraints.facingMode = 'user';
-        }
+        const videoConstraints = cameraDeviceId
+          ? {
+              deviceId: { exact: cameraDeviceId },
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+            }
+          : {
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              facingMode: 'user',
+            };
 
-        stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
-        if (disposed) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraints,
+        });
+        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
 
-        video = document.createElement('video');
+        const video = document.createElement('video');
         video.srcObject = stream;
         video.playsInline = true;
         await video.play();
 
+        let rafId;
         const loop = async () => {
-          if (disposed) return;
+          if (!active) return;
           if (video.readyState >= 2) await hands.send({ image: video });
           rafId = requestAnimationFrame(loop);
         };
         rafId = requestAnimationFrame(loop);
+
+        return () => {
+          active = false;
+          cancelAnimationFrame(rafId);
+          stream.getTracks().forEach((t) => t.stop());
+        };
       } catch (err) {
-        if (!disposed) console.warn('Hand tracking unavailable:', err);
+        console.warn('Hand tracking unavailable:', err);
       }
     }
 
-    run();
-
+    const cleanupPromise = init();
     return () => {
-      disposed = true;
-      cancelAnimationFrame(rafId);
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop());
-        stream = null;
-      }
-      if (hands && typeof hands.close === 'function') {
-        try { hands.close(); } catch (_) { /* noop */ }
-      }
-      hands = null;
+      active = false;
+      cleanupPromise.then((cleanup) => cleanup?.());
     };
-  }, [enabled, videoDeviceId]);
+  }, [enabled, cameraDeviceId]);
 
   return { fingertipPos, pinchCbRef };
 }
@@ -1078,14 +1067,6 @@ function HostView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
   const [playing, setPlaying] = useState(false);
   const [handEnabled, setHandEnabled] = useState(false);
-  const [cameraDevices, setCameraDevices] = useState([]);
-  const [cameraId, setCameraId] = useState(() => {
-    try {
-      return sessionStorage.getItem('hostCameraId') || '';
-    } catch (_) {
-      return '';
-    }
-  });
   const [hostScene, setHostScene] = useState(() => {
     try {
       const s = sessionStorage.getItem('hostScene');
@@ -1093,41 +1074,48 @@ function HostView({ room, shared, onResetRoom }) {
     } catch (_) { /* sessionStorage may be unavailable */ }
     return 'water';
   });
+  const [cameraDeviceId, setCameraDeviceId] = useState(() => {
+    try {
+      return sessionStorage.getItem('hostVideoDeviceId') || '';
+    } catch (_) {
+      return '';
+    }
+  });
+  const [videoInputs, setVideoInputs] = useState([]);
   const audioRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('hostVideoDeviceId', cameraDeviceId || '');
+    } catch (_) { /* noop */ }
+  }, [cameraDeviceId]);
+
+  const refreshVideoDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices();
+      setVideoInputs(list.filter((d) => d.kind === 'videoinput'));
+    } catch (_) { /* noop */ }
+  }, []);
+
+  useEffect(() => {
+    refreshVideoDevices();
+    const md = navigator.mediaDevices;
+    md?.addEventListener?.('devicechange', refreshVideoDevices);
+    return () => md?.removeEventListener?.('devicechange', refreshVideoDevices);
+  }, [refreshVideoDevices]);
+
+  useEffect(() => {
+    if (!handEnabled) return;
+    const t = window.setTimeout(refreshVideoDevices, 400);
+    return () => clearTimeout(t);
+  }, [handEnabled, refreshVideoDevices]);
 
   useEffect(() => {
     try {
       sessionStorage.setItem('hostScene', hostScene);
     } catch (_) { /* noop */ }
   }, [hostScene]);
-
-  useEffect(() => {
-    try {
-      if (cameraId) sessionStorage.setItem('hostCameraId', cameraId);
-      else sessionStorage.removeItem('hostCameraId');
-    } catch (_) { /* noop */ }
-  }, [cameraId]);
-
-  const refreshCameras = useCallback(async () => {
-    if (!navigator.mediaDevices?.enumerateDevices) return;
-    try {
-      const inputs = await navigator.mediaDevices.enumerateDevices();
-      setCameraDevices(inputs.filter((d) => d.kind === 'videoinput'));
-    } catch (_) { /* noop */ }
-  }, []);
-
-  useEffect(() => {
-    refreshCameras();
-    const md = navigator.mediaDevices;
-    if (!md?.addEventListener) return undefined;
-    md.addEventListener('devicechange', refreshCameras);
-    return () => md.removeEventListener('devicechange', refreshCameras);
-  }, [refreshCameras]);
-
-  useEffect(() => {
-    if (!handEnabled) return;
-    refreshCameras();
-  }, [handEnabled, refreshCameras]);
 
   // ── Drag state ────────────────────────────────────────────────────────────
   // Use refs for the hot path (updated every RAF frame) and state only for
@@ -1155,7 +1143,7 @@ function HostView({ room, shared, onResetRoom }) {
   }, [room]);
 
   // ── Hand tracking ─────────────────────────────────────────────────────────
-  const { fingertipPos, pinchCbRef } = useHandTracking(handEnabled, cameraId);
+  const { fingertipPos, pinchCbRef } = useHandTracking(handEnabled, cameraDeviceId);
 
   // Keep heldPos in sync with the fingertip while dragging.
   useEffect(() => {
@@ -1286,6 +1274,22 @@ function HostView({ room, shared, onResetRoom }) {
           {playing ? '⏸ Music' : '▶ Music'}
         </button>
         <span className="hud-divider" />
+        <div className="hud-field">
+          <select
+            className="hud-select hud-select--camera"
+            value={cameraDeviceId}
+            onChange={(e) => setCameraDeviceId(e.target.value)}
+            aria-label="Webcam for hand tracking"
+          >
+            <option value="">Default camera</option>
+            {videoInputs.map((d, i) => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label?.trim() ? d.label : `Camera ${i + 1}`}
+              </option>
+            ))}
+          </select>
+        </div>
+        <span className="hud-divider" />
         <button
           type="button"
           className={`hud-btn${handEnabled ? ' hud-btn-active' : ''}`}
@@ -1293,20 +1297,6 @@ function HostView({ room, shared, onResetRoom }) {
         >
           {handEnabled ? '✋ On' : '✋ Off'}
         </button>
-        <span className="hud-divider" />
-        <select
-          className="hud-select hud-select-camera"
-          value={cameraId}
-          onChange={(e) => setCameraId(e.target.value)}
-          aria-label="Camera for hand tracking"
-        >
-          <option value="">Default camera</option>
-          {cameraDevices.map((d, i) => (
-            <option key={d.deviceId || `cam-${i}`} value={d.deviceId}>
-              {d.label || `Camera ${i + 1}`}
-            </option>
-          ))}
-        </select>
       </div>
 
       <div className="qr-corner">

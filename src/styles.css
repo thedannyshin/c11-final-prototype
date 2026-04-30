@@ -366,13 +366,9 @@ p {
   box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.35);
 }
 
-.hud-select option {
-  background: #0f172a;
-  color: #f1f5f9;
-}
-
-.hud-select-camera {
-  max-width: 14rem;
+.hud-select--camera {
+  max-width: min(18rem, 44vw);
+  min-width: 8.5rem;
 }
 
 /* ── Host layout ─────────────────────────────────────────────────────────── */
