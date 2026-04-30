@@ -124,6 +124,38 @@ function drawCoverImage(ctx, img, destW, destH) {
   return true;
 }
 
+/** Static field star with twinkle (night sky ambient). */
+function drawAmbientStar(ctx, x, y, r, baseOpacity, t, phase, speed, hasCross) {
+  const tw = 0.5 + 0.5 * Math.sin(t * speed + phase);
+  const a = baseOpacity * tw;
+  ctx.fillStyle = `rgba(255, 250, 230, ${a})`;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  if (hasCross && a > 0.2) {
+    ctx.strokeStyle = `rgba(255, 255, 255, ${a * 0.45})`;
+    ctx.lineWidth = 0.55;
+    ctx.beginPath();
+    ctx.moveTo(x - r * 3, y);
+    ctx.lineTo(x + r * 3, y);
+    ctx.moveTo(x, y - r * 3);
+    ctx.lineTo(x, y + r * 3);
+    ctx.stroke();
+  }
+}
+
+/** Small rising sparkle (creature trails & collisions in starry scene). */
+function drawRisingStarParticle(ctx, bx, by, r, opacity) {
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.rotate(Math.PI / 4);
+  ctx.fillStyle = `rgba(255, 242, 200, ${opacity})`;
+  const s = Math.max(0.8, r * 0.9);
+  ctx.fillRect(-s * 0.22, -s, s * 0.44, s * 2);
+  ctx.fillRect(-s, -s * 0.22, s * 2, s * 0.44);
+  ctx.restore();
+}
+
 function makeId(len = 6) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -577,6 +609,7 @@ function AquariumCanvas({
   const canvasRef = useRef(null);
   const charactersRef = useRef([]);
   const bubblesRef = useRef([]);
+  const starsAmbientRef = useRef([]);
   const charBubblesRef = useRef([]);
   const bubbleStreamsRef = useRef([]); // collision streams: trickle bubbles upward over time
   const animRef = useRef(null);
@@ -609,7 +642,7 @@ function AquariumCanvas({
     return () => window.removeEventListener('resize', fit);
   }, []);
 
-  // Spawn bubbles once.
+  // Spawn ambient bubbles (water) and field stars (starry sky).
   useEffect(() => {
     bubblesRef.current = Array.from({ length: 26 }, () => ({
       x: Math.random(),
@@ -619,6 +652,15 @@ function AquariumCanvas({
       opacity: 0.10 + Math.random() * 0.18,
       wobble: Math.random() * Math.PI * 2,
       wobbleSpeed: 0.4 + Math.random() * 0.9,
+    }));
+    starsAmbientRef.current = Array.from({ length: 72 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      r: 0.45 + Math.random() * 2.1,
+      twinklePhase: Math.random() * Math.PI * 2,
+      twinkleSpeed: 0.55 + Math.random() * 2.2,
+      baseOpacity: 0.1 + Math.random() * 0.55,
+      hasCross: Math.random() > 0.78,
     }));
   }, []);
 
@@ -723,6 +765,22 @@ function AquariumCanvas({
           ctx.fillStyle = `rgba(220, 245, 255, ${b.opacity * 0.85})`;
           ctx.fill();
           ctx.restore();
+        }
+      }
+
+      if (scene === 'stars') {
+        for (const s of starsAmbientRef.current) {
+          drawAmbientStar(
+            ctx,
+            s.x * W,
+            s.y * H,
+            s.r,
+            s.baseOpacity,
+            t,
+            s.twinklePhase,
+            s.twinkleSpeed,
+            s.hasCross,
+          );
         }
       }
 
@@ -853,7 +911,7 @@ function AquariumCanvas({
         }
       }
 
-      // Character-emitted bubbles.
+      // Character-emitted bubbles (water/grass) or star sparkles (starry sky).
       charBubblesRef.current = charBubblesRef.current.filter((b) => b.opacity > 0.02);
       for (const b of charBubblesRef.current) {
         b.y -= b.vy;
@@ -861,17 +919,21 @@ function AquariumCanvas({
         b.opacity -= 0.0008;
         const bx = (b.x + Math.sin(b.wobble) * 0.004) * W;
         const by = b.y * H;
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(bx, by, b.r, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(160, 220, 255, ${b.opacity})`;
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(bx - b.r * 0.3, by - b.r * 0.35, b.r * 0.28, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(220, 245, 255, ${b.opacity * 0.7})`;
-        ctx.fill();
-        ctx.restore();
+        if (scene === 'stars') {
+          drawRisingStarParticle(ctx, bx, by, b.r, b.opacity);
+        } else {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(bx, by, b.r, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(160, 220, 255, ${b.opacity})`;
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(bx - b.r * 0.3, by - b.r * 0.35, b.r * 0.28, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(220, 245, 255, ${b.opacity * 0.7})`;
+          ctx.fill();
+          ctx.restore();
+        }
       }
 
       animRef.current = requestAnimationFrame(frame);
