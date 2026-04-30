@@ -379,8 +379,8 @@ p {
 }
 
 .hud-select--camera {
-  max-width: min(18rem, 44vw);
-  min-width: 8.5rem;
+  max-width: min(11rem, 30vw);
+  min-width: 5.5rem;
 }
 
 /* ── Host layout ─────────────────────────────────────────────────────────── */
