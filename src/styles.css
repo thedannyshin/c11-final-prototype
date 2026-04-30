@@ -540,6 +540,33 @@ p {
   color: rgba(255,255,255,0.35);
 }
 
+.participant-scene-row {
+  flex-shrink: 0;
+}
+
+.participant-scene-select {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(10,22,40,0.85);
+  color: rgba(255,255,255,0.9);
+  font: inherit;
+  font-size: 0.875rem;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.participant-scene-select:focus {
+  outline: none;
+  border-color: rgba(0,212,255,0.45);
+  box-shadow: 0 0 0 2px rgba(0,212,255,0.2);
+}
+
+.participant-scene-select option {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
 .pad-layout {
   flex: 1;
   min-height: 0;

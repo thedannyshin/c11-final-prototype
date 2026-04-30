@@ -21,6 +21,11 @@ const HOST_SCENE_OPTIONS = [
   { id: 'stars', label: 'Starry sky' },
 ];
 
+function normalizeRoomBackground(v) {
+  if (v === 'grass' || v === 'stars' || v === 'water') return v;
+  return 'water';
+}
+
 function drawCoverImage(ctx, img, destW, destH) {
   if (!img?.naturalWidth) return false;
   const iw = img.naturalWidth;
@@ -143,6 +148,7 @@ function drawCharacterAt(ctx, character, cx, cy, maxSizePx, angle = 0) {
 // Transport layer — Firebase Realtime Database (cross-device sync).
 // Strokes are stored under rooms/{roomId}/strokes/{strokeId}.
 // Presence is stored under rooms/{roomId}/presence/{clientId}.
+// rooms/{roomId}/settings/background — big-screen scene (water | grass | stars).
 // onValue listeners fire immediately with current data (catch-up) and then
 // on every subsequent change, so no separate readState/writeState is needed.
 // ---------------------------------------------------------------------------
@@ -150,6 +156,7 @@ function createTransport(roomId) {
   const db = getDatabase(firebaseApp);
   const strokesRef = dbRef(db, `rooms/${roomId}/strokes`);
   const presenceRef = dbRef(db, `rooms/${roomId}/presence`);
+  const settingsBgRef = dbRef(db, `rooms/${roomId}/settings/background`);
   const listeners = new Set();
   const handle = (msg) => listeners.forEach((fn) => fn(msg));
 
@@ -167,6 +174,13 @@ function createTransport(roomId) {
     handle({ type: 'room:state', payload: { participants } });
   });
 
+  const unsubSettingsBg = onValue(settingsBgRef, (snapshot) => {
+    handle({
+      type: 'room:state',
+      payload: { roomBackground: normalizeRoomBackground(snapshot.val()) },
+    });
+  });
+
   return {
     send(message) {
       if (message.type === 'character:add' || message.type === 'stroke:add') {
@@ -174,6 +188,8 @@ function createTransport(roomId) {
         set(dbRef(db, `rooms/${roomId}/strokes/${stroke.id}`), stroke);
       } else if (message.type === 'canvas:clear') {
         set(strokesRef, null);
+      } else if (message.type === 'room:setBackground') {
+        set(settingsBgRef, message.payload);
       } else if (message.type === 'presence:update') {
         set(dbRef(db, `rooms/${roomId}/presence/${message.clientId}`), {
           ...message.payload,
@@ -190,6 +206,7 @@ function createTransport(roomId) {
     destroy() {
       unsubStrokes();
       unsubPresence();
+      unsubSettingsBg();
       listeners.clear();
     },
   };
@@ -339,6 +356,7 @@ function useHandTracking(enabled, cameraDeviceId = '') {
 function useSharedRoom(roomId, client) {
   const [strokes, setStrokes] = useState([]);
   const [participants, setParticipants] = useState({});
+  const [roomBackground, setRoomBackgroundState] = useState('water');
   const transportRef = useRef(null);
 
   useEffect(() => {
@@ -347,6 +365,7 @@ function useSharedRoom(roomId, client) {
     // Clear stale state from the previous room before loading the new one.
     setStrokes([]);
     setParticipants({});
+    setRoomBackgroundState('water');
 
     const transport = createTransport(roomId);
     transportRef.current = transport;
@@ -381,6 +400,9 @@ function useSharedRoom(roomId, client) {
         if (Array.isArray(message.payload.strokes)) setStrokes(message.payload.strokes);
         if (message.payload.participants && typeof message.payload.participants === 'object') {
           setParticipants(message.payload.participants);
+        }
+        if (message.payload.roomBackground !== undefined) {
+          setRoomBackgroundState(normalizeRoomBackground(message.payload.roomBackground));
         }
       }
     });
@@ -421,6 +443,7 @@ function useSharedRoom(roomId, client) {
   return useMemo(() => ({
     strokes,
     participants,
+    roomBackground,
     addCharacter(character) {
       setStrokes((prev) => {
         if (prev.some((s) => s.id === character.id)) return prev;
@@ -436,7 +459,16 @@ function useSharedRoom(roomId, client) {
       setStrokes([]);
       transportRef.current?.send({ type: 'canvas:clear', clientId: client.clientId, payload: null });
     },
-  }), [strokes, participants, client.clientId]);
+    setRoomBackground(bg) {
+      const b = normalizeRoomBackground(bg);
+      setRoomBackgroundState(b);
+      transportRef.current?.send({
+        type: 'room:setBackground',
+        clientId: client.clientId,
+        payload: b,
+      });
+    },
+  }), [strokes, participants, roomBackground, client.clientId]);
 }
 
 
@@ -1067,13 +1099,6 @@ function HostView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
   const [playing, setPlaying] = useState(false);
   const [handEnabled, setHandEnabled] = useState(false);
-  const [hostScene, setHostScene] = useState(() => {
-    try {
-      const s = sessionStorage.getItem('hostScene');
-      if (s === 'water' || s === 'grass' || s === 'stars') return s;
-    } catch (_) { /* sessionStorage may be unavailable */ }
-    return 'water';
-  });
   const [cameraDeviceId, setCameraDeviceId] = useState(() => {
     try {
       return sessionStorage.getItem('hostVideoDeviceId') || '';
@@ -1110,12 +1135,6 @@ function HostView({ room, shared, onResetRoom }) {
     const t = window.setTimeout(refreshVideoDevices, 400);
     return () => clearTimeout(t);
   }, [handEnabled, refreshVideoDevices]);
-
-  useEffect(() => {
-    try {
-      sessionStorage.setItem('hostScene', hostScene);
-    } catch (_) { /* noop */ }
-  }, [hostScene]);
 
   // ── Drag state ────────────────────────────────────────────────────────────
   // Use refs for the hot path (updated every RAF frame) and state only for
@@ -1236,12 +1255,12 @@ function HostView({ room, shared, onResetRoom }) {
             heldPosRef={heldPosRef}
             positionsRef={creaturePositionsRef}
             teleportRef={teleportRef}
-            scene={hostScene}
+            scene={shared.roomBackground}
           />
         </div>
         <SideAquarium
           creatures={sideCreatures}
-          scene={hostScene}
+          scene={shared.roomBackground}
           onReleaseAll={() => {
             setSideCreatures([]);
             hiddenIdsRef.current = new Set();
@@ -1251,21 +1270,6 @@ function HostView({ room, shared, onResetRoom }) {
       </div>
 
       <div className="host-hud">
-        <div className="hud-field">
-          <select
-            className="hud-select"
-            value={hostScene}
-            onChange={(e) => setHostScene(e.target.value)}
-            aria-label="Scene style"
-          >
-            {HOST_SCENE_OPTIONS.map(({ id, label }) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <span className="hud-divider" />
         <button type="button" className="hud-btn" onClick={onResetRoom}>
           New room
         </button>
@@ -1323,6 +1327,20 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
       <div className="participant-header">
         <span className="pill">Room {room}</span>
         <span className="muted-text" style={{ fontSize: '0.8125rem' }}>Draw your creature</span>
+      </div>
+      <div className="participant-scene-row">
+        <select
+          className="participant-scene-select"
+          value={shared.roomBackground}
+          onChange={(e) => shared.setRoomBackground(e.target.value)}
+          aria-label="Big screen background"
+        >
+          {HOST_SCENE_OPTIONS.map(({ id, label }) => (
+            <option key={id} value={id}>
+              {label}
+            </option>
+          ))}
+        </select>
       </div>
       <DrawingPad onCommit={shared.addCharacter} />
     </div>
