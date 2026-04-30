@@ -79,19 +79,12 @@ function HudIconFullscreenExit() {
   );
 }
 
-function HudIconMusicPlay() {
+function HudIconMusic() {
   return (
-    <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden>
-      <path d="M8 5.5v13L18.5 12 8 5.5z" fill="currentColor" />
-    </svg>
-  );
-}
-
-function HudIconMusicPause() {
-  return (
-    <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden>
-      <rect x="7" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
-      <rect x="13" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
+    <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="16" r="3" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -1412,12 +1405,12 @@ function HostView({ room, shared, onResetRoom }) {
         <span className="hud-divider" />
         <button
           type="button"
-          className="hud-btn hud-btn--icon"
+          className={`hud-btn hud-btn--icon${playing ? ' hud-btn-active' : ''}`}
           onClick={toggleMusic}
           aria-label={playing ? 'Pause music' : 'Play music'}
           title={playing ? 'Pause music' : 'Play music'}
         >
-          {playing ? <HudIconMusicPause /> : <HudIconMusicPlay />}
+          <HudIconMusic />
         </button>
         <span className="hud-divider" />
         <div className="hud-camera-wrap" title="Choose webcam for hand tracking">
