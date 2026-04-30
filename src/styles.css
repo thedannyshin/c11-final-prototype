@@ -371,6 +371,10 @@ p {
   color: #f1f5f9;
 }
 
+.hud-select-camera {
+  max-width: 14rem;
+}
+
 /* ── Host layout ─────────────────────────────────────────────────────────── */
 .host-layout {
   position: absolute;
