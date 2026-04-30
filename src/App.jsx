@@ -7,7 +7,11 @@ const CANVAS_W = 1200;
 const CANVAS_H = 700;
 const DEFAULT_COLOR = '#00D4FF';
 const COLORS = ['#FFFFFF', '#00D4FF', '#F43F5E', '#10B981', '#FBBF24', '#A78BFA'];
-const SIDE_PANEL_W = 330;
+const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
+
+function mainAquariumWidthPx() {
+  return window.innerWidth * (1 - SHOWCASE_WIDTH_FRAC);
+}
 
 /** Host screen background art (see /public/bg-*.png). */
 const HOST_BG_BY_SCENE = {
@@ -1260,7 +1264,7 @@ function HostView({ room, shared, onResetRoom }) {
   // Keep heldPos in sync with the fingertip while dragging.
   useEffect(() => {
     if (!heldIdRef.current || !fingertipPos) return;
-    const canvasW = window.innerWidth - SIDE_PANEL_W;
+    const canvasW = mainAquariumWidthPx();
     const canvasH = window.innerHeight;
     heldPosRef.current = {
       x: Math.max(0, Math.min(1, fingertipPos.x / canvasW)),
@@ -1272,7 +1276,7 @@ function HostView({ room, shared, onResetRoom }) {
   useEffect(() => {
     pinchCbRef.current.onStart = (pos) => {
       if (heldIdRef.current || !pos) return;
-      const canvasW = window.innerWidth - SIDE_PANEL_W;
+      const canvasW = mainAquariumWidthPx();
       const canvasH = window.innerHeight;
       const normX = pos.x / canvasW;
       const normY = pos.y / canvasH;
@@ -1298,7 +1302,7 @@ function HostView({ room, shared, onResetRoom }) {
     pinchCbRef.current.onEnd = (pos) => {
       const id = heldIdRef.current;
       if (!id) return;
-      const canvasW = window.innerWidth - SIDE_PANEL_W;
+      const canvasW = mainAquariumWidthPx();
 
       if (pos && pos.x > canvasW) {
         // Dropped in side panel — store drop position relative to panel left edge.
