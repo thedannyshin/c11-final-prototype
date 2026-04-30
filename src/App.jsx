@@ -7,7 +7,7 @@ const CANVAS_W = 1200;
 const CANVAS_H = 700;
 const DEFAULT_COLOR = '#00D4FF';
 const COLORS = ['#FFFFFF', '#00D4FF', '#F43F5E', '#10B981', '#FBBF24', '#A78BFA'];
-const SIDE_PANEL_W = 300;
+const SIDE_PANEL_W = 330;
 
 /** Host screen background art (see /public/bg-*.png). */
 const HOST_BG_BY_SCENE = {
@@ -94,6 +94,15 @@ function HudIconWebcam() {
     <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
       <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  );
+}
+
+function HudIconReleaseAll() {
+  return (
+    <svg className="hud-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
     </svg>
   );
 }
@@ -935,12 +944,6 @@ function SideAquarium({ creatures, onReleaseAll, scene = 'water' }) {
       }
 
       if (!creatures.length) {
-        ctx.fillStyle = 'rgba(255,255,255,0.18)';
-        ctx.font = '12px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Drag creatures here', W / 2, H / 2 - 8);
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
-        ctx.fillText('using your fingertip', W / 2, H / 2 + 10);
         return;
       }
 
@@ -970,14 +973,17 @@ function SideAquarium({ creatures, onReleaseAll, scene = 'water' }) {
 
   return (
     <div className="side-panel">
-      <div className="side-panel-header">
-        <span className="side-panel-title">Showcase</span>
-        {creatures.length > 0 && (
-          <button type="button" className="hud-btn" onClick={onReleaseAll} style={{ fontSize: '0.7rem' }}>
-            Release all
-          </button>
-        )}
-      </div>
+      {creatures.length > 0 && (
+        <button
+          type="button"
+          className="side-panel-release"
+          onClick={onReleaseAll}
+          aria-label="Release all creatures to main screen"
+          title="Release all"
+        >
+          <HudIconReleaseAll />
+        </button>
+      )}
       <canvas ref={canvasRef} className="side-canvas" />
     </div>
   );

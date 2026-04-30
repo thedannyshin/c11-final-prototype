@@ -464,7 +464,8 @@ p {
 
 /* ── Side panel ──────────────────────────────────────────────────────────── */
 .side-panel {
-  width: 300px;
+  position: relative;
+  width: 330px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -475,19 +476,30 @@ p {
   z-index: 1;
 }
 
-.side-panel-header {
-  display: flex;
+.side-panel-release {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 18px 16px 10px;
-  flex-shrink: 0;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
-.side-panel-title {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.28);
+.side-panel-release:hover {
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .side-canvas {
@@ -538,7 +550,7 @@ p {
 .qr-corner {
   position: absolute;
   top: 20px;
-  right: calc(300px + 20px);
+  right: calc(330px + 20px);
   z-index: 10;
   display: flex;
   flex-direction: column;
