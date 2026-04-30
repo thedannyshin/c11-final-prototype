@@ -150,6 +150,56 @@ function getJoinUrl(room) {
   return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(room)}&mode=participant`;
 }
 
+/** True for phone / tablet widths; wide screens default to host, narrow to participant when URL does not specify. */
+function isMobileViewport() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(max-width: 1024px)').matches;
+}
+
+let cachedInitialAppState = null;
+function getInitialAppStateOnce() {
+  if (cachedInitialAppState === null) {
+    const { room: urlRoom, mode: urlMode } = getUrlState();
+    const modePinned = urlMode === 'host' || urlMode === 'participant';
+    const mobile = isMobileViewport();
+
+    if (modePinned) {
+      let mode = urlMode;
+      // Normalize share links to the intended device: host dashboard on wide screens, draw UI on phones.
+      if (urlMode === 'host' && mobile) {
+        mode = 'participant';
+      } else if (urlMode === 'participant' && !mobile) {
+        mode = 'host';
+      }
+      cachedInitialAppState = {
+        room: urlRoom,
+        mode,
+        roomInput: urlRoom || '',
+      };
+    } else if (urlRoom) {
+      cachedInitialAppState = {
+        room: urlRoom,
+        mode: 'participant',
+        roomInput: urlRoom,
+      };
+    } else if (isMobileViewport()) {
+      cachedInitialAppState = {
+        room: '',
+        mode: 'participant',
+        roomInput: '',
+      };
+    } else {
+      const next = makeId();
+      cachedInitialAppState = {
+        room: next,
+        mode: 'host',
+        roomInput: next,
+      };
+    }
+  }
+  return cachedInitialAppState;
+}
+
 function normalizePoint(p) {
   return {
     x: Math.max(0, Math.min(1, p.x)),
@@ -1415,10 +1465,10 @@ function HomeView({ onCreateHost, roomInput, setRoomInput, onJoinParticipant }) 
 // Root
 // ---------------------------------------------------------------------------
 export default function App() {
-  const initial = getUrlState();
+  const initial = getInitialAppStateOnce();
   const [room, setRoom] = useState(initial.room);
   const [mode, setMode] = useState(initial.mode);
-  const [roomInput, setRoomInput] = useState(initial.room);
+  const [roomInput, setRoomInput] = useState(initial.roomInput);
   const [clientName, setClientName] = useState('');
   const clientId = useMemo(() => crypto.randomUUID(), []);
   const clientColor = useMemo(() => COLORS[Math.floor(Math.random() * COLORS.length)], []);
