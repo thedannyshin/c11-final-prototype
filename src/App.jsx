@@ -15,6 +15,12 @@ const HOST_BG_BY_SCENE = {
   grass: '/bg-grass.png',
   stars: '/bg-starry.png',
 };
+/** Looping ambience per big-screen scene (files in /public). */
+const HOST_MUSIC_BY_SCENE = {
+  water: '/under-the-sea.mp3',
+  grass: '/grass.mp3',
+  stars: '/starry-sky.mp3',
+};
 const HOST_SCENE_OPTIONS = [
   { id: 'water', label: 'Aquarium' },
   { id: 'grass', label: 'Grass' },
@@ -1233,6 +1239,21 @@ function HostView({ room, shared, onResetRoom }) {
     };
   }, []);
 
+  const musicSrc =
+    HOST_MUSIC_BY_SCENE[normalizeRoomBackground(shared.roomBackground)] ?? HOST_MUSIC_BY_SCENE.water;
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const wasPlaying = !audio.paused;
+    audio.src = musicSrc;
+    audio.load();
+    if (wasPlaying) {
+      audio.volume = 0.4;
+      audio.play().catch(() => setPlaying(false));
+    }
+  }, [musicSrc]);
+
   const toggleMusic = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -1244,7 +1265,7 @@ function HostView({ room, shared, onResetRoom }) {
 
   return (
     <div className="host-fullscreen">
-      <audio ref={audioRef} src="/music.mp3" loop />
+      <audio ref={audioRef} loop preload="metadata" />
 
       <div className="host-layout">
         <div className="aquarium-wrapper">
