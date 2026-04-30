@@ -13,7 +13,7 @@ function mainAquariumWidthPx() {
   return window.innerWidth * (1 - SHOWCASE_WIDTH_FRAC);
 }
 
-/** Host screen background art (see /public/bg-*.png). */
+/** Host screen background art (see /public/bg-*.png). Water uses gradient-only in canvas (bitmap has painted bubbles). */
 const HOST_BG_BY_SCENE = {
   water: '/bg-water.png',
   grass: '/bg-grass.png',
@@ -122,38 +122,6 @@ function drawCoverImage(ctx, img, destW, destH) {
   const dy = (destH - dh) / 2;
   ctx.drawImage(img, dx, dy, dw, dh);
   return true;
-}
-
-/** Static field star with twinkle (night sky ambient). */
-function drawAmbientStar(ctx, x, y, r, baseOpacity, t, phase, speed, hasCross) {
-  const tw = 0.5 + 0.5 * Math.sin(t * speed + phase);
-  const a = baseOpacity * tw;
-  ctx.fillStyle = `rgba(255, 250, 230, ${a})`;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-  if (hasCross && a > 0.2) {
-    ctx.strokeStyle = `rgba(255, 255, 255, ${a * 0.45})`;
-    ctx.lineWidth = 0.55;
-    ctx.beginPath();
-    ctx.moveTo(x - r * 3, y);
-    ctx.lineTo(x + r * 3, y);
-    ctx.moveTo(x, y - r * 3);
-    ctx.lineTo(x, y + r * 3);
-    ctx.stroke();
-  }
-}
-
-/** Small rising sparkle (creature trails & collisions in starry scene). */
-function drawRisingStarParticle(ctx, bx, by, r, opacity) {
-  ctx.save();
-  ctx.translate(bx, by);
-  ctx.rotate(Math.PI / 4);
-  ctx.fillStyle = `rgba(255, 242, 200, ${opacity})`;
-  const s = Math.max(0.8, r * 0.9);
-  ctx.fillRect(-s * 0.22, -s, s * 0.44, s * 2);
-  ctx.fillRect(-s, -s * 0.22, s * 2, s * 0.44);
-  ctx.restore();
 }
 
 function makeId(len = 6) {
@@ -608,10 +576,6 @@ function AquariumCanvas({
 }) {
   const canvasRef = useRef(null);
   const charactersRef = useRef([]);
-  const bubblesRef = useRef([]);
-  const starsAmbientRef = useRef([]);
-  const charBubblesRef = useRef([]);
-  const bubbleStreamsRef = useRef([]); // collision streams: trickle bubbles upward over time
   const animRef = useRef(null);
   const knownIdsRef = useRef(new Set());
   const sceneRef = useRef(scene);
@@ -623,6 +587,7 @@ function AquariumCanvas({
 
   useEffect(() => {
     Object.entries(HOST_BG_BY_SCENE).forEach(([id, src]) => {
+      if (id === 'water') return;
       if (bgImgBySceneRef.current[id]?.complete) return;
       const img = new Image();
       img.src = src;
@@ -642,36 +607,12 @@ function AquariumCanvas({
     return () => window.removeEventListener('resize', fit);
   }, []);
 
-  // Spawn ambient bubbles (water) and field stars (starry sky).
-  useEffect(() => {
-    bubblesRef.current = Array.from({ length: 26 }, () => ({
-      x: Math.random(),
-      y: Math.random(),
-      r: 1.5 + Math.random() * 3.2,
-      speed: 0.00018 + Math.random() * 0.00032,
-      opacity: 0.10 + Math.random() * 0.18,
-      wobble: Math.random() * Math.PI * 2,
-      wobbleSpeed: 0.4 + Math.random() * 0.9,
-    }));
-    starsAmbientRef.current = Array.from({ length: 72 }, () => ({
-      x: Math.random(),
-      y: Math.random(),
-      r: 0.45 + Math.random() * 2.1,
-      twinklePhase: Math.random() * Math.PI * 2,
-      twinkleSpeed: 0.55 + Math.random() * 2.2,
-      baseOpacity: 0.1 + Math.random() * 0.55,
-      hasCross: Math.random() > 0.78,
-    }));
-  }, []);
-
   // Sync incoming strokes → animated character entries.
   // Also removes creatures that have been taken out of strokes (e.g. dragged
   // to the side panel) so they don't linger in the animation loop.
   useEffect(() => {
     if (strokes.length === 0) {
       charactersRef.current = [];
-      charBubblesRef.current = [];
-      bubbleStreamsRef.current = [];
       knownIdsRef.current.clear();
       return;
     }
@@ -692,13 +633,10 @@ function AquariumCanvas({
           // Populated when swim starts:
           dir: Math.random() < 0.5 ? 1 : -1,
           speed: 0.0009 + Math.random() * 0.0007,
-          lastBumpAt: -999,
-          holdUntil: 0,
           baseY: 0,
           waveFreq: 0.5 + Math.random() * 0.8,
           wavePhase: Math.random() * Math.PI * 2,
           waveAmp: 0.010 + Math.random() * 0.016,
-          nextBubbleAt: 0,
         });
       }
     }
@@ -718,7 +656,7 @@ function AquariumCanvas({
       const H = canvas.height;
 
       const scene = sceneRef.current;
-      const bgImg = bgImgBySceneRef.current[scene];
+      const bgImg = scene === 'water' ? null : bgImgBySceneRef.current[scene];
 
       if (!drawCoverImage(ctx, bgImg, W, H)) {
         const fall = ctx.createLinearGradient(0, 0, 0, H);
@@ -746,42 +684,6 @@ function AquariumCanvas({
         surf.addColorStop(1, 'rgba(30, 110, 190, 0)');
         ctx.fillStyle = surf;
         ctx.fillRect(0, 0, W, H * 0.28);
-
-        // Ambient bubbles.
-        for (const b of bubblesRef.current) {
-          b.y -= b.speed;
-          b.wobble += b.wobbleSpeed * 0.016;
-          if (b.y < -0.04) { b.y = 1.03; b.x = Math.random(); }
-          const bx = (b.x + Math.sin(b.wobble) * 0.006) * W;
-          const by = b.y * H;
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(bx, by, b.r, 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(140, 210, 255, ${b.opacity})`;
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(bx - b.r * 0.32, by - b.r * 0.35, b.r * 0.28, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(220, 245, 255, ${b.opacity * 0.85})`;
-          ctx.fill();
-          ctx.restore();
-        }
-      }
-
-      if (scene === 'stars') {
-        for (const s of starsAmbientRef.current) {
-          drawAmbientStar(
-            ctx,
-            s.x * W,
-            s.y * H,
-            s.r,
-            s.baseOpacity,
-            t,
-            s.twinklePhase,
-            s.twinkleSpeed,
-            s.hasCross,
-          );
-        }
       }
 
       // Consume any pending teleport (creature dropped at a specific position).
@@ -789,7 +691,7 @@ function AquariumCanvas({
         const { id, x, y } = teleportRef.current;
         teleportRef.current = null;
         const tc = charactersRef.current.find((c) => c.id === id);
-        if (tc) { tc.x = x; tc.y = y; tc.baseY = y; tc.phase = 'swim'; tc.holdUntil = 0; }
+        if (tc) { tc.x = x; tc.y = y; tc.baseY = y; tc.phase = 'swim'; }
       }
 
       // Characters.
@@ -810,37 +712,16 @@ function AquariumCanvas({
             c.y = c.targetY;
             c.baseY = c.targetY;
             c.phase = 'swim';
-            c.nextBubbleAt = t + 3 + Math.random() * 9;
           }
           drawCharacterAt(ctx, c.character, c.x * W, c.y * H, charSize, 0);
         } else {
-          // Horizontal swim — paused during a bump hold.
-          if (t >= c.holdUntil) {
-            c.x += c.dir * c.speed;
-            if (c.x <= 0.04) { c.x = 0.04; c.dir = 1; }
-            if (c.x >= 0.96) { c.x = 0.96; c.dir = -1; }
-          }
+          c.x += c.dir * c.speed;
+          if (c.x <= 0.04) { c.x = 0.04; c.dir = 1; }
+          if (c.x >= 0.96) { c.x = 0.96; c.dir = -1; }
 
           // Vertical undulation via sine wave — each creature has its own
           // frequency, amplitude and phase so nothing moves in sync.
           c.y = c.baseY + Math.sin(t * c.waveFreq * Math.PI * 2 + c.wavePhase) * c.waveAmp;
-
-          // Emit a small cluster of bubbles occasionally.
-          if (t >= c.nextBubbleAt) {
-            const count = 1 + Math.floor(Math.random() * 2);
-            for (let i = 0; i < count; i++) {
-              charBubblesRef.current.push({
-                x: c.x + (Math.random() - 0.5) * 0.05,
-                y: c.y - 0.02,
-                r: 1.2 + Math.random() * 2.2,
-                vy: 0.00022 + Math.random() * 0.00028,
-                opacity: 0.35 + Math.random() * 0.3,
-                wobble: Math.random() * Math.PI * 2,
-                wobbleSpeed: 0.3 + Math.random() * 0.5,
-              });
-            }
-            c.nextBubbleAt = t + 5 + Math.random() * 12;
-          }
 
           // Facing direction: mirror horizontally when going left, no tilt.
           drawCharacterAt(ctx, c.character, c.x * W, c.y * H, charSize, c.dir === -1 ? Math.PI : 0);
@@ -850,90 +731,6 @@ function AquariumCanvas({
       // Export normalised creature positions for drag hit-testing.
       if (positionsRef) {
         positionsRef.current = charactersRef.current.map((c) => ({ id: c.id, x: c.x, y: c.y }));
-      }
-
-      // Collision — only fire when characters are actively swimming toward each
-      // other. On contact: flip both directions (bounce) + push apart so they
-      // never overlap, then burst bubbles.
-      const swimmers = charactersRef.current.filter((c) => c.phase === 'swim');
-      for (let i = 0; i < swimmers.length; i++) {
-        for (let j = i + 1; j < swimmers.length; j++) {
-          const a = swimmers[i];
-          const b = swimmers[j];
-          const dx = Math.abs(a.x - b.x) * W;
-          const dy = Math.abs(a.y - b.y) * H;
-
-          // Simple distance check — if they overlap, react.
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist >= charSize * 1.2) continue;
-
-          // Cooldown so a bounce doesn't retrigger immediately.
-          if (t - a.lastBumpAt < 2 || t - b.lastBumpAt < 2) continue;
-
-          a.lastBumpAt = t;
-          b.lastBumpAt = t;
-
-          // Flip directions now but freeze movement for 500ms —
-          // they hold at the contact point while bubbles rise, then swim away.
-          a.dir *= -1;
-          b.dir *= -1;
-          a.holdUntil = t + 0.5;
-          b.holdUntil = t + 0.5;
-
-          // Start a bubble stream at the contact point.
-          bubbleStreamsRef.current.push({
-            x: (a.x + b.x) / 2,
-            y: (a.y + b.y) / 2,
-            startT: t,
-            duration: 2.0 + Math.random() * 1.5,
-            lastEmitT: -99,
-          });
-        }
-      }
-
-      // Bubble streams from collisions — trickle upward until expired.
-      bubbleStreamsRef.current = bubbleStreamsRef.current.filter((s) => t - s.startT < s.duration);
-      for (const s of bubbleStreamsRef.current) {
-        if (t - s.lastEmitT > 0.07) {
-          s.lastEmitT = t;
-          const n = 1 + Math.floor(Math.random() * 2);
-          for (let k = 0; k < n; k++) {
-            charBubblesRef.current.push({
-              x: s.x + (Math.random() - 0.5) * 0.018,
-              y: s.y - (Math.random() * 0.02),
-              r: 1.5 + Math.random() * 3.0,
-              vy: 0.0005 + Math.random() * 0.0005,
-              opacity: 0.65 + Math.random() * 0.3,
-              wobble: Math.random() * Math.PI * 2,
-              wobbleSpeed: 0.5 + Math.random() * 0.8,
-            });
-          }
-        }
-      }
-
-      // Character-emitted bubbles (water/grass) or star sparkles (starry sky).
-      charBubblesRef.current = charBubblesRef.current.filter((b) => b.opacity > 0.02);
-      for (const b of charBubblesRef.current) {
-        b.y -= b.vy;
-        b.wobble += b.wobbleSpeed * 0.016;
-        b.opacity -= 0.0008;
-        const bx = (b.x + Math.sin(b.wobble) * 0.004) * W;
-        const by = b.y * H;
-        if (scene === 'stars') {
-          drawRisingStarParticle(ctx, bx, by, b.r, b.opacity);
-        } else {
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(bx, by, b.r, 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(160, 220, 255, ${b.opacity})`;
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(bx - b.r * 0.3, by - b.r * 0.35, b.r * 0.28, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(220, 245, 255, ${b.opacity * 0.7})`;
-          ctx.fill();
-          ctx.restore();
-        }
       }
 
       animRef.current = requestAnimationFrame(frame);
@@ -995,7 +792,7 @@ function SideAquarium({ creatures, onReleaseAll, scene = 'water' }) {
     const src = HOST_BG_BY_SCENE[scene] || HOST_BG_BY_SCENE.water;
 
     const paint = (img) => {
-      if (img && drawCoverImage(ctx, img, W, H)) {
+      if (scene !== 'water' && img && drawCoverImage(ctx, img, W, H)) {
         const v = ctx.createLinearGradient(0, H * 0.45, 0, H);
         v.addColorStop(0, 'rgba(0,0,0,0)');
         v.addColorStop(1, 'rgba(5,10,22,0.55)');
@@ -1024,6 +821,11 @@ function SideAquarium({ creatures, onReleaseAll, scene = 'water' }) {
         ctx.restore();
       });
     };
+
+    if (scene === 'water') {
+      paint(null);
+      return;
+    }
 
     const img = new Image();
     let cancelled = false;
