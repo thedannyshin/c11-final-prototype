@@ -1085,6 +1085,16 @@ function HostView({ room, shared, onResetRoom }) {
   const [sideCreatures, setSideCreatures] = useState([]);
   const [heldCreature, setHeldCreature] = useState(null);
 
+  useEffect(() => {
+    heldIdRef.current = null;
+    heldPosRef.current = null;
+    teleportRef.current = null;
+    setHeldCreature(null);
+    hiddenIdsRef.current = new Set();
+    setHiddenIds(new Set());
+    setSideCreatures([]);
+  }, [room]);
+
   // ── Hand tracking ─────────────────────────────────────────────────────────
   const { fingertipPos, pinchCbRef } = useHandTracking(handEnabled);
 
@@ -1196,8 +1206,25 @@ function HostView({ room, shared, onResetRoom }) {
       <div className="host-hud">
         <span className="hud-room">Room&nbsp;<strong>{room}</strong></span>
         <span className="hud-divider" />
-        <button type="button" className="hud-btn" onClick={shared.clearCanvas}>Clear</button>
-        <button type="button" className="hud-btn" onClick={onResetRoom}>New room</button>
+        <label className="hud-field">
+          <span className="hud-field-label">Background</span>
+          <select
+            className="hud-select"
+            value={hostScene}
+            onChange={(e) => setHostScene(e.target.value)}
+            aria-label="Background scene"
+          >
+            {HOST_SCENE_OPTIONS.map(({ id, label }) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="hud-divider" />
+        <button type="button" className="hud-btn" onClick={onResetRoom}>
+          New room
+        </button>
         <span className="hud-divider" />
         <button type="button" className="hud-btn" onClick={toggleMusic}>
           {playing ? '⏸ Music' : '▶ Music'}
@@ -1210,21 +1237,6 @@ function HostView({ room, shared, onResetRoom }) {
         >
           {handEnabled ? '✋ On' : '✋ Off'}
         </button>
-      </div>
-
-      <div className="host-scene-bar" role="group" aria-label="Room background">
-        <span className="scene-bar-label">Background</span>
-        {HOST_SCENE_OPTIONS.map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            className={`scene-tab${hostScene === id ? ' is-active' : ''}`}
-            aria-pressed={hostScene === id}
-            onClick={() => setHostScene(id)}
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
       <div className="qr-corner">
