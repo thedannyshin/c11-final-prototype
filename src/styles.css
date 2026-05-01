@@ -392,60 +392,25 @@ p {
   box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.35);
 }
 
-.hud-camera-wrap {
+.hud-camera-control {
   position: relative;
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
   flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
 }
 
-.hud-camera-wrap:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.hud-camera-wrap:focus-within {
-  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.35);
-}
-
-.hud-camera-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.hud-camera-wrap:hover .hud-camera-icon {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.hud-select--camera-icon {
+.hud-select--camera-hidden {
   position: absolute;
-  inset: 0;
-  width: 100% !important;
-  height: 100%;
-  margin: 0;
+  width: 1px;
+  height: 1px;
   padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  border: 0;
   opacity: 0;
-  cursor: pointer;
-  font-size: 16px;
-  min-width: 0;
-  max-width: none !important;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  appearance: none;
-  -webkit-appearance: none;
-  box-shadow: none;
-}
-
-.hud-select--camera-icon:focus {
-  box-shadow: none;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 /* ── Host layout ─────────────────────────────────────────────────────────── */
