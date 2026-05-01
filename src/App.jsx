@@ -1164,6 +1164,17 @@ function DrawingPad({ onCommit }) {
 function HostView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
   const [playing, setPlaying] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('hostMusicVolume');
+      if (raw == null) return 1;
+      const v = parseFloat(raw);
+      return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
+    } catch (_) {
+      return 1;
+    }
+  });
+  const [musicVolumePopoverOpen, setMusicVolumePopoverOpen] = useState(false);
   const [handEnabled, setHandEnabled] = useState(false);
   const [cameraDeviceId, setCameraDeviceId] = useState(() => {
     try {
@@ -1174,11 +1185,15 @@ function HostView({ room, shared, onResetRoom }) {
   });
   const [videoInputs, setVideoInputs] = useState([]);
   const audioRef = useRef(null);
+  const musicVolumeRef = useRef(musicVolume);
+  const hudMusicWrapRef = useRef(null);
   const cameraSelectRef = useRef(null);
   const hostRootRef = useRef(null);
   const [hostFullscreen, setHostFullscreen] = useState(false);
   const [hudIdleHidden, setHudIdleHidden] = useState(false);
   const hudIdleTimerRef = useRef(null);
+
+  musicVolumeRef.current = musicVolume;
 
   useEffect(() => {
     const sync = () => {
@@ -1227,6 +1242,38 @@ function HostView({ room, shared, onResetRoom }) {
       window.removeEventListener('touchstart', onActivity);
     };
   }, [bumpHudActivity, clearHudIdleTimer]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('hostMusicVolume', String(musicVolume));
+    } catch (_) { /* noop */ }
+  }, [musicVolume]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) audio.volume = musicVolume;
+  }, [musicVolume]);
+
+  useEffect(() => {
+    if (!musicVolumePopoverOpen) return;
+    const onPointerDown = (e) => {
+      if (hudMusicWrapRef.current?.contains(e.target)) return;
+      setMusicVolumePopoverOpen(false);
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setMusicVolumePopoverOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [musicVolumePopoverOpen]);
+
+  useEffect(() => {
+    if (hudIdleHidden) setMusicVolumePopoverOpen(false);
+  }, [hudIdleHidden]);
 
   useEffect(() => {
     try {
@@ -1361,8 +1408,8 @@ function HostView({ room, shared, onResetRoom }) {
     const wasPlaying = !audio.paused;
     audio.src = musicSrc;
     audio.load();
+    audio.volume = musicVolumeRef.current;
     if (wasPlaying) {
-      audio.volume = 0.4;
       audio.play().catch(() => setPlaying(false));
     }
   }, [musicSrc]);
@@ -1371,7 +1418,11 @@ function HostView({ room, shared, onResetRoom }) {
     const audio = audioRef.current;
     if (!audio) return;
     if (playing) { audio.pause(); setPlaying(false); }
-    else { audio.volume = 0.4; audio.play().catch(() => {}); setPlaying(true); }
+    else {
+      audio.volume = musicVolume;
+      audio.play().catch(() => {});
+      setPlaying(true);
+    }
   };
 
   const toggleHostFullscreen = useCallback(async () => {
@@ -1441,15 +1492,46 @@ function HostView({ room, shared, onResetRoom }) {
           {hostFullscreen ? <HudIconFullscreenExit /> : <HudIconFullscreenEnter />}
         </button>
         <span className="hud-divider" />
-        <button
-          type="button"
-          className={`hud-btn hud-btn--icon${playing ? ' hud-btn-active' : ''}`}
-          onClick={toggleMusic}
-          aria-label={playing ? 'Pause music' : 'Play music'}
-          title={playing ? 'Pause music' : 'Play music'}
-        >
-          <HudIconMusic />
-        </button>
+        <div className="hud-music-wrap" ref={hudMusicWrapRef}>
+          <button
+            type="button"
+            className={`hud-btn hud-btn--icon${playing ? ' hud-btn-active' : ''}`}
+            onClick={toggleMusic}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              bumpHudActivity();
+              setMusicVolumePopoverOpen((open) => !open);
+            }}
+            aria-label={playing ? 'Pause music' : 'Play music'}
+            aria-expanded={musicVolumePopoverOpen}
+            aria-haspopup="dialog"
+            title={`${playing ? 'Pause music' : 'Play music'} · Right-click: volume`}
+          >
+            <HudIconMusic />
+          </button>
+          {musicVolumePopoverOpen ? (
+            <div
+              className="hud-volume-popover"
+              role="dialog"
+              aria-label="Music volume"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <span className="hud-volume-popover-label">Volume</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={musicVolume}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  setMusicVolume(Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1);
+                }}
+              />
+              <span className="hud-volume-popover-value">{Math.round(musicVolume * 100)}%</span>
+            </div>
+          ) : null}
+        </div>
         <span className="hud-divider" />
         <div className="hud-camera-control">
           <button
