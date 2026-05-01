@@ -895,7 +895,7 @@ function HeldCreatureOverlay({ creature, pos }) {
 // ---------------------------------------------------------------------------
 // Side aquarium — static glowing display of creatures dragged from main tank.
 // ---------------------------------------------------------------------------
-function SideAquarium({ creatures, onReleaseAll, scene = 'water', joinUrl, room }) {
+function SideAquarium({ creatures, onReleaseAll, scene = 'water' }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -961,31 +961,18 @@ function SideAquarium({ creatures, onReleaseAll, scene = 'water', joinUrl, room 
 
   return (
     <div className="side-panel">
-      <div className="side-panel-body">
-        <div className="side-panel-stage">
-          {creatures.length > 0 && (
-            <button
-              type="button"
-              className="side-panel-release"
-              onClick={onReleaseAll}
-              aria-label="Release all creatures to main screen"
-              title="Release all"
-            >
-              <HudIconReleaseAll />
-            </button>
-          )}
-          <canvas ref={canvasRef} className="side-canvas" />
-        </div>
-        {joinUrl && room ? (
-          <div className="side-panel-qr" aria-label="Room QR code">
-            <div className="qr-corner qr-corner--embedded">
-              <div className="qr-label">Scan to join</div>
-              <QRCodeSVG value={joinUrl} size={96} bgColor="transparent" fgColor="#ffffff" />
-              <div className="qr-room">{room}</div>
-            </div>
-          </div>
-        ) : null}
-      </div>
+      {creatures.length > 0 && (
+        <button
+          type="button"
+          className="side-panel-release"
+          onClick={onReleaseAll}
+          aria-label="Release all creatures to main screen"
+          title="Release all"
+        >
+          <HudIconReleaseAll />
+        </button>
+      )}
+      <canvas ref={canvasRef} className="side-canvas" />
     </div>
   );
 }
@@ -1422,8 +1409,6 @@ function HostView({ room, shared, onResetRoom }) {
         <SideAquarium
           creatures={sideCreatures}
           scene={shared.roomBackground}
-          joinUrl={joinUrl}
-          room={room}
           onReleaseAll={() => {
             setSideCreatures([]);
             hiddenIdsRef.current = new Set();
@@ -1506,6 +1491,12 @@ function HostView({ room, shared, onResetRoom }) {
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="qr-corner">
+        <div className="qr-label">Scan to join</div>
+        <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
+        <div className="qr-room">{room}</div>
       </div>
 
       <HeldCreatureOverlay creature={heldCreature} pos={fingertipPos} />

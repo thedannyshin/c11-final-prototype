@@ -456,32 +456,6 @@ p {
   z-index: 1;
 }
 
-.side-panel-body {
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  min-height: 0;
-  min-width: 0;
-}
-
-.side-panel-stage {
-  flex: 1 1 0%;
-  min-width: 0;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-}
-
-.side-panel-qr {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 10px 8px;
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
-}
-
 .side-panel-release {
   position: absolute;
   top: 10px;
@@ -554,6 +528,11 @@ p {
 }
 
 .qr-corner {
+  position: absolute;
+  top: 20px;
+  /* Flush to viewport right (side panel occupies ~30% — QR sits in that strip). */
+  right: 20px;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -564,10 +543,6 @@ p {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 18px;
-}
-
-.qr-corner--embedded {
-  max-width: 118px;
 }
 
 .qr-label {
