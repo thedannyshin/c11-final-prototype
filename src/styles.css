@@ -300,6 +300,11 @@ p {
   background: #050e18;
 }
 
+/* Hide OS mouse cursor while HUD is idle-hidden (hand fingertip overlay is unaffected). */
+.host-fullscreen--ui-idle {
+  cursor: none;
+}
+
 .host-hud {
   position: absolute;
   top: 20px;

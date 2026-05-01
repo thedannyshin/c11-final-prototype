@@ -1388,7 +1388,10 @@ function HostView({ room, shared, onResetRoom }) {
   const visibleStrokes = shared.strokes.filter((s) => !hiddenIds.has(s.id));
 
   return (
-    <div className="host-fullscreen" ref={hostRootRef}>
+    <div
+      className={`host-fullscreen${hudIdleHidden ? ' host-fullscreen--ui-idle' : ''}`}
+      ref={hostRootRef}
+    >
       <audio ref={audioRef} loop preload="metadata" />
 
       <div className="host-layout">
