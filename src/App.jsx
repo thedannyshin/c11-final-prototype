@@ -1177,6 +1177,8 @@ function HostView({ room, shared, onResetRoom }) {
   const cameraSelectRef = useRef(null);
   const hostRootRef = useRef(null);
   const [hostFullscreen, setHostFullscreen] = useState(false);
+  const [hudIdleHidden, setHudIdleHidden] = useState(false);
+  const hudIdleTimerRef = useRef(null);
 
   useEffect(() => {
     const sync = () => {
@@ -1190,6 +1192,41 @@ function HostView({ room, shared, onResetRoom }) {
       document.removeEventListener('webkitfullscreenchange', sync);
     };
   }, []);
+
+  const clearHudIdleTimer = useCallback(() => {
+    if (hudIdleTimerRef.current != null) {
+      clearTimeout(hudIdleTimerRef.current);
+      hudIdleTimerRef.current = null;
+    }
+  }, []);
+
+  const bumpHudActivity = useCallback(() => {
+    setHudIdleHidden(false);
+    if (hudIdleTimerRef.current != null) clearTimeout(hudIdleTimerRef.current);
+    hudIdleTimerRef.current = window.setTimeout(() => {
+      hudIdleTimerRef.current = null;
+      setHudIdleHidden(true);
+    }, 2800);
+  }, []);
+
+  useEffect(() => {
+    bumpHudActivity();
+    const onActivity = () => bumpHudActivity();
+    const opts = { passive: true };
+    window.addEventListener('mousemove', onActivity, opts);
+    window.addEventListener('mousedown', onActivity, opts);
+    window.addEventListener('wheel', onActivity, opts);
+    window.addEventListener('keydown', onActivity);
+    window.addEventListener('touchstart', onActivity, opts);
+    return () => {
+      clearHudIdleTimer();
+      window.removeEventListener('mousemove', onActivity);
+      window.removeEventListener('mousedown', onActivity);
+      window.removeEventListener('wheel', onActivity);
+      window.removeEventListener('keydown', onActivity);
+      window.removeEventListener('touchstart', onActivity);
+    };
+  }, [bumpHudActivity, clearHudIdleTimer]);
 
   useEffect(() => {
     try {
@@ -1377,7 +1414,10 @@ function HostView({ room, shared, onResetRoom }) {
         />
       </div>
 
-      <div className="host-hud">
+      <div
+        className={`host-hud${hudIdleHidden ? ' host-hud--idle-hidden' : ''}`}
+        aria-hidden={hudIdleHidden}
+      >
         <button
           type="button"
           className="hud-btn hud-btn--icon"

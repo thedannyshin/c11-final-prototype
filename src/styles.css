@@ -317,6 +317,16 @@ p {
   flex-wrap: wrap;
   row-gap: 6px;
   user-select: none;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+.host-hud--idle-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .hud-count {
