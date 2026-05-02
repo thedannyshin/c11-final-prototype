@@ -429,51 +429,56 @@ p {
 }
 
 .hud-music-wrap {
-  position: relative;
   display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  gap: 4px;
 }
 
-.hud-volume-popover {
-  position: absolute;
-  top: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%);
+/* Volume strip expands to the right of the icon on hover (YouTube-style). */
+.hud-volume-rail {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: rgba(5, 14, 28, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
-  z-index: 20;
-  min-width: 220px;
+  gap: 8px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    max-width 0.22s ease,
+    opacity 0.18s ease;
 }
 
-.hud-volume-popover-label {
-  flex-shrink: 0;
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.55);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.hud-music-wrap:hover .hud-volume-rail,
+.hud-music-wrap:focus-within .hud-volume-rail {
+  max-width: 140px;
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.hud-volume-popover input[type='range'] {
-  flex: 1;
-  min-width: 0;
+/* Touch / no-hover: keep slider usable without hover. */
+@media (hover: none), (pointer: coarse) {
+  .hud-volume-rail {
+    max-width: 140px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.hud-volume-rail input[type='range'] {
+  width: 92px;
+  min-width: 92px;
   height: 4px;
   accent-color: #00d4ff;
   cursor: pointer;
 }
 
-.hud-volume-popover-value {
+.hud-volume-rail-value {
   flex-shrink: 0;
-  width: 2.5rem;
-  font-size: 0.75rem;
+  width: 2.25rem;
+  font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.75);
-  text-align: right;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 /* ── Host layout ─────────────────────────────────────────────────────────── */
