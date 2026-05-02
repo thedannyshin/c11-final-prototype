@@ -93,6 +93,17 @@ function HudIconMusic() {
   );
 }
 
+function HudIconMusicOff() {
+  return (
+    <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="16" r="3" fill="currentColor" stroke="none" />
+      <line x1="2" y1="22" x2="22" y2="2" />
+    </svg>
+  );
+}
+
 function HudIconWebcam() {
   return (
     <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -1249,8 +1260,10 @@ function HostView({ room, shared, onResetRoom }) {
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (audio) audio.volume = musicVolume;
-  }, [musicVolume]);
+    if (!audio) return;
+    // When paused, output is silent but `musicVolume` keeps the user's preferred level for next play.
+    audio.volume = playing ? musicVolume : 0;
+  }, [musicVolume, playing]);
 
   useEffect(() => {
     try {
@@ -1385,17 +1398,22 @@ function HostView({ room, shared, onResetRoom }) {
     const wasPlaying = !audio.paused;
     audio.src = musicSrc;
     audio.load();
-    audio.volume = musicVolumeRef.current;
     if (wasPlaying) {
+      audio.volume = musicVolumeRef.current;
       audio.play().catch(() => setPlaying(false));
+    } else {
+      audio.volume = 0;
     }
   }, [musicSrc]);
 
   const toggleMusic = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (playing) { audio.pause(); setPlaying(false); }
-    else {
+    if (playing) {
+      audio.pause();
+      audio.volume = 0;
+      setPlaying(false);
+    } else {
       audio.volume = musicVolume;
       audio.play().catch(() => {});
       setPlaying(true);
@@ -1477,21 +1495,28 @@ function HostView({ room, shared, onResetRoom }) {
             aria-label={playing ? 'Pause music' : 'Play music'}
             title={playing ? 'Pause music' : 'Play music'}
           >
-            <HudIconMusic />
+            {playing ? <HudIconMusic /> : <HudIconMusicOff />}
           </button>
-          <div className="hud-volume-rail" aria-label="Music volume">
+          <div
+            className="hud-volume-rail"
+            aria-label="Music volume"
+            title={playing ? undefined : `Paused — will play at ${Math.round(musicVolume * 100)}%`}
+          >
             <input
               type="range"
               min={0}
               max={1}
               step={0.01}
-              value={musicVolume}
+              value={playing ? musicVolume : 0}
+              disabled={!playing}
               onChange={(e) => {
                 const v = parseFloat(e.target.value);
                 setMusicVolume(Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1);
               }}
             />
-            <span className="hud-volume-rail-value">{Math.round(musicVolume * 100)}%</span>
+            <span className="hud-volume-rail-value">
+              {playing ? `${Math.round(musicVolume * 100)}%` : '0%'}
+            </span>
           </div>
         </div>
         <span className="hud-divider" />

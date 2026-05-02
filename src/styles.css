@@ -473,6 +473,11 @@ p {
   cursor: pointer;
 }
 
+.hud-volume-rail input[type='range']:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .hud-volume-rail-value {
   flex-shrink: 0;
   width: 2.25rem;
