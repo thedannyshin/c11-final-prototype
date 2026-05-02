@@ -95,12 +95,19 @@ function HudIconMusic() {
 
 function HudIconMusicOff() {
   return (
-    <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M9 18V5l12-2v13" />
       <circle cx="6" cy="18" r="3" fill="currentColor" stroke="none" />
       <circle cx="18" cy="16" r="3" fill="currentColor" stroke="none" />
-      {/* Shorter than corner-to-corner so the slash has clear padding inside the icon. */}
-      <line x1="5.5" y1="19" x2="19" y2="5.5" />
+      {/* Inset diagonal so the slash “floats” with clear space from the notes and frame */}
+      <line
+        x1="6.5"
+        y1="17.5"
+        x2="17.5"
+        y2="6.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+      />
     </svg>
   );
 }
