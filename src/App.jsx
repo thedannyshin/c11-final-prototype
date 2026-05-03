@@ -2346,8 +2346,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
           <div className="participant-flow-inner participant-flow-inner--splash-card">
             <ClockItLogo variant="phone" />
             <p className="participant-flow-wait">
-              Get ready—you&apos;ll draw on this phone. When your round starts, draw as fast as you can and send as many
-              creatures as you can.
+              Get ready to draw on your phone. During your round, draw quickly and send as many creatures as possible.
             </p>
             <p className="participant-assigned-team" role="status" aria-live="polite">
               You&apos;re on <strong>Team {assignedTeam}</strong>
