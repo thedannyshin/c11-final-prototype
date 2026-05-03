@@ -701,35 +701,93 @@ p {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   margin-top: 12px;
 }
 
-.host-flow-scene-select {
+.host-flow-scene-heading {
+  margin: 0;
+  font-size: clamp(0.78rem, 2.2vw, 0.88rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+  text-align: center;
+}
+
+.host-flow-scene-picker {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: clamp(6px, 2vw, 12px);
   width: 100%;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.host-flow-scene-thumb {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 6.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px 4px;
+  margin: 0;
+  border: none;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.96);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
   font: inherit;
-  font-size: 1rem;
-  font-weight: 600;
-  padding: 12px 14px;
+  font-size: clamp(0.68rem, 2vw, 0.8rem);
+  font-weight: 700;
+  line-height: 1.15;
   cursor: pointer;
-  min-height: 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.host-flow-scene-thumb:focus-visible {
+  outline: 2px solid rgba(0, 212, 255, 0.65);
+  outline-offset: 3px;
+}
+
+.host-flow-scene-thumb-visual {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
   box-sizing: border-box;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
-.host-flow-scene-select:focus {
-  outline: 2px solid rgba(255, 255, 255, 0.35);
-  outline-offset: 2px;
-  border-color: rgba(255, 255, 255, 0.45);
+.host-flow-scene-thumb:hover .host-flow-scene-thumb-visual {
+  border-color: rgba(255, 255, 255, 0.48);
 }
 
-.host-flow-scene-select option {
-  background: #0f172a;
-  color: #f1f5f9;
+.host-flow-scene-thumb:active .host-flow-scene-thumb-visual {
+  transform: scale(0.97);
+}
+
+.host-flow-scene-thumb--selected .host-flow-scene-thumb-visual {
+  border-color: rgba(0, 212, 255, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(0, 212, 255, 0.35),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.host-flow-scene-thumb-caption {
+  display: block;
+  max-width: 100%;
+  text-align: center;
+  text-wrap: balance;
 }
 
 .host-flow-actions {

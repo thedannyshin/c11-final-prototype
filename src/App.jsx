@@ -1983,35 +1983,46 @@ function HostView({ room, shared, onResetRoom }) {
             </div>
             <QRCodeSVG value={joinUrl} size={140} bgColor="transparent" fgColor="#ffffff" />
             <div className="host-flow-scene">
-              <select
-                id="host-splash-scene"
-                className="host-flow-scene-select"
-                value={splashBgChosen ? normalizeRoomBackground(shared.roomBackground) : ''}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (!v) return;
-                  shared.setRoomBackground(v);
-                  setSplashBgChosen(true);
-                  setPlaying(true);
-                }}
-                aria-label="Background for the big screen"
+              <p className="host-flow-scene-heading" id="host-splash-scene-label">
+                Pick your stage
+              </p>
+              <div
+                className="host-flow-scene-picker"
+                role="group"
+                aria-labelledby="host-splash-scene-label"
               >
-                <option value="" disabled>
-                  Select a Background
-                </option>
-                {HOST_SCENE_OPTIONS.map(({ id, label }) => (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+                {HOST_SCENE_OPTIONS.map(({ id, label }) => {
+                  const chosen =
+                    splashBgChosen && normalizeRoomBackground(shared.roomBackground) === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={`host-flow-scene-thumb${chosen ? ' host-flow-scene-thumb--selected' : ''}`}
+                      aria-pressed={chosen}
+                      onClick={() => {
+                        shared.setRoomBackground(id);
+                        setSplashBgChosen(true);
+                        setPlaying(true);
+                      }}
+                    >
+                      <span
+                        className="host-flow-scene-thumb-visual"
+                        style={{ backgroundImage: `url('${HOST_BG_BY_SCENE[id]}')` }}
+                        aria-hidden
+                      />
+                      <span className="host-flow-scene-thumb-caption">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="host-flow-actions host-flow-actions--single">
               <button
                 type="button"
                 className="host-flow-action-btn"
                 disabled={!splashBgChosen}
-                title={splashBgChosen ? undefined : 'Select a background first'}
+                title={splashBgChosen ? undefined : 'Pick a stage first'}
                 onClick={() => {
                   setHandEnabled(true);
                   shared.gamePlayFromSplash();
