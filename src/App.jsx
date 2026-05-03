@@ -2035,7 +2035,7 @@ function HostView({ room, shared, onResetRoom }) {
             <p className="host-flow-splash-lead">
               Form 2 teams of 2. Have your partner scan this QR code.
             </p>
-            <QRCodeSVG value={joinUrl} size={200} bgColor="transparent" fgColor="#ffffff" />
+            <QRCodeSVG value={joinUrl} size={140} bgColor="transparent" fgColor="#ffffff" />
             <div className="host-flow-scene">
               <select
                 id="host-splash-scene"
@@ -2297,7 +2297,7 @@ function HostView({ room, shared, onResetRoom }) {
       g.phase !== 'countdown_team2' ? (
         <div className="qr-corner">
           <div className="qr-label">Join on your phone</div>
-          <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
+          <QRCodeSVG value={joinUrl} size={84} bgColor="transparent" fgColor="#ffffff" />
         </div>
       ) : null}
 

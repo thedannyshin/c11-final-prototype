@@ -1417,18 +1417,18 @@ p {
 }
 
 .participant-team-strip--unset {
-  background: rgba(251, 191, 36, 0.2);
   color: rgba(254, 243, 199, 0.96);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
 }
 
 .participant-team-strip--1 {
-  background: rgba(34, 211, 238, 0.2);
   color: rgba(207, 250, 254, 0.96);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
 }
 
 .participant-team-strip--2 {
-  background: rgba(244, 63, 94, 0.2);
   color: rgba(255, 228, 235, 0.96);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
 }
 
 .participant-team-strip-label {
@@ -1454,7 +1454,6 @@ p {
   padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(0, 0, 0, 0.25);
   color: rgba(255, 255, 255, 0.95);
   font: inherit;
   font-size: 0.78rem;
@@ -1465,7 +1464,7 @@ p {
 }
 
 .participant-team-chip:hover {
-  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.55);
 }
 
 .participant-team-picker {
@@ -1502,7 +1501,6 @@ p {
   min-height: 48px;
   border-radius: 14px;
   border: 2px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.07);
   color: rgba(255, 255, 255, 0.96);
   font: inherit;
   font-size: 1rem;
@@ -1510,14 +1508,12 @@ p {
   cursor: pointer;
   transition:
     border-color 0.15s,
-    background 0.15s,
     box-shadow 0.15s;
 }
 
 .participant-team-btn.is-selected {
-  border-color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.16);
-  box-shadow: 0 0 28px rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 .participant-sitout-card {
@@ -1530,8 +1526,7 @@ p {
   gap: 10px;
   padding: 28px 20px;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(5, 14, 28, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   text-align: center;
 }
 
