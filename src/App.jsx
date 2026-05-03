@@ -107,6 +107,11 @@ const HOST_SCENE_OPTIONS = [
   { id: 'stars', label: 'Starry sky' },
 ];
 
+/** Crossfade / zoom / rotate timing — host AquariumCanvas splash + phone splash backdrop */
+const SPLASH_CROSSFADE_MS = 1100;
+const SPLASH_ZOOM_CYCLE_MS = 4500;
+const SPLASH_ZOOM_AMOUNT = 0.07;
+
 function normalizeRoomBackground(v) {
   if (v === 'grass' || v === 'stars' || v === 'water') return v;
   return 'water';
@@ -122,6 +127,62 @@ function preloadSceneBackgroundArt() {
     img.onerror = () => {};
     img.src = src;
   });
+}
+
+/** Phone splash: cycles scene art + crossfade + zoom like host AquariumCanvas splash preview. */
+function ParticipantSplashBackdrop({ active }) {
+  const [idx, setIdx] = useState(0);
+  const [blend, setBlend] = useState(0);
+
+  useEffect(() => {
+    if (!active) {
+      setIdx(0);
+      setBlend(0);
+      return undefined;
+    }
+    setIdx(0);
+    setBlend(0);
+    const id = window.setInterval(() => {
+      setBlend(1);
+      window.setTimeout(() => {
+        setIdx((i) => (i + 1) % HOST_SCENE_OPTIONS.length);
+        setBlend(0);
+      }, SPLASH_CROSSFADE_MS);
+    }, SPLASH_ZOOM_CYCLE_MS);
+    return () => window.clearInterval(id);
+  }, [active]);
+
+  const n = HOST_SCENE_OPTIONS.length;
+  const sceneBottom = HOST_SCENE_OPTIONS[idx].id;
+  const sceneTop = HOST_SCENE_OPTIONS[(idx + 1) % n].id;
+  const urlBottom = HOST_BG_BY_SCENE[sceneBottom];
+  const urlTop = HOST_BG_BY_SCENE[sceneTop];
+  const tf = `opacity ${SPLASH_CROSSFADE_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`;
+
+  return (
+    <div className="participant-splash-bg" aria-hidden>
+      <div className="participant-splash-bg-zoom">
+        <div
+          className="participant-splash-bg-layer"
+          data-scene={sceneBottom}
+          style={{
+            opacity: 1 - blend,
+            backgroundImage: `url('${urlBottom}')`,
+            transition: tf,
+          }}
+        />
+        <div
+          className="participant-splash-bg-layer"
+          data-scene={sceneTop}
+          style={{
+            opacity: blend,
+            backgroundImage: `url('${urlTop}')`,
+            transition: tf,
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function getBrowserFullscreenElement() {
@@ -938,10 +999,6 @@ function useSharedRoom(roomId, client) {
 // scene            — key in HOST_BG_BY_SCENE (full-bleed art + vignette).
 // splashBgEffects  — when true, crossfade + slow zoom while splash preview rotates.
 // ---------------------------------------------------------------------------
-const SPLASH_CROSSFADE_MS = 1100;
-const SPLASH_ZOOM_CYCLE_MS = 4500;
-const SPLASH_ZOOM_AMOUNT = 0.07;
-
 function AquariumCanvas({
   strokes,
   heldIdRef = null,
@@ -1300,7 +1357,7 @@ function SideAquarium({ creatures, onReleaseAll, scene = 'water' }) {
 // repaints old strokes. Committed strokes live on an offscreen canvas that
 // is blitted once on stroke-end, not on every move event.
 // ---------------------------------------------------------------------------
-function DrawingPad({ onCommit }) {
+function DrawingPad({ onCommit, overlay = null }) {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
   const committedRef = useRef(null); // offscreen canvas — all finished strokes
@@ -1445,6 +1502,7 @@ function DrawingPad({ onCommit }) {
   return (
     <div className="pad-layout">
       <div className="drawing-pad-frame">
+        {overlay ? <div className="drawing-pad-overlay">{overlay}</div> : null}
         <div className="drawing-pad-bg" aria-hidden />
         <canvas
           ref={canvasRef}
@@ -2169,17 +2227,21 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
 
   return (
     <div
-      className="participant-shell"
+      className={`participant-shell${gm.phase === 'splash' ? ' participant-shell--splash-mode' : ''}`}
       data-scene={scene}
       style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
     >
+      {gm.phase === 'splash' ? <ParticipantSplashBackdrop active /> : null}
+
       {gm.phase === 'splash' ? (
         <div className="participant-flow-overlay participant-flow-overlay--splash">
-          <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
-          <p className="participant-flow-wait">
-            Get ready—you&apos;ll draw on this phone. When your round starts, draw as fast as you can and send as many
-            creatures as you can.
-          </p>
+          <div className="participant-flow-inner participant-flow-inner--splash-card">
+            <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
+            <p className="participant-flow-wait">
+              Get ready—you&apos;ll draw on this phone. When your round starts, draw as fast as you can and send as many
+              creatures as you can.
+            </p>
+          </div>
         </div>
       ) : null}
 
@@ -2239,13 +2301,17 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
               {gm.roundEndAt ? formatRoundClock(gm.roundEndAt) : '—'}
             </span>
           </div>
-          <p
-            className={`participant-draw-hint${drawHintVisible ? '' : ' participant-draw-hint--faded'}`}
-            aria-hidden={!drawHintVisible}
-          >
-            Draw as fast as you can—send as many creatures as you can before time runs out.
-          </p>
-          <DrawingPad onCommit={shared.addCharacter} />
+          <DrawingPad
+            onCommit={shared.addCharacter}
+            overlay={
+              <p
+                className={`participant-draw-hint${drawHintVisible ? '' : ' participant-draw-hint--faded'}`}
+                aria-hidden={!drawHintVisible}
+              >
+                Draw as fast as you can—send as many creatures as you can before time runs out.
+              </p>
+            }
+          />
         </>
       ) : null}
     </div>
