@@ -2130,9 +2130,9 @@ function HostView({ room, shared, onResetRoom }) {
             {g.roundEndAt ? <p className="host-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
           </div>
           <p key={`host-pinch-hint-${g.phase}`} className="host-play-hint">
-            Pinch to grab creatures and move
+            Pinch to grab creatures and
             <br />
-            them to the right side.
+            move them to the right side.
           </p>
         </div>
       ) : null}

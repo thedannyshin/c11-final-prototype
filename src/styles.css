@@ -645,9 +645,6 @@ p {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 28px 64px rgba(0, 0, 0, 0.55);
 }
 
 .host-flow-inner {
@@ -668,6 +665,11 @@ p {
   max-width: 100%;
   object-fit: contain;
   filter: drop-shadow(0 4px 28px rgba(0, 0, 0, 0.55));
+}
+
+.host-flow-inner--splash-card .clockit-logo,
+.participant-flow-inner--splash-card .clockit-logo {
+  filter: none;
 }
 
 .clockit-logo--small {
@@ -716,9 +718,9 @@ p {
 }
 
 .host-flow-scene-select:focus {
-  outline: none;
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 2px;
   border-color: rgba(255, 255, 255, 0.45);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }
 
 .host-flow-scene-select option {
@@ -754,7 +756,6 @@ p {
   font-weight: 800;
   letter-spacing: 0.05em;
   cursor: pointer;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
   min-height: 52px;
   box-sizing: border-box;
 }
@@ -952,9 +953,6 @@ p {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 28px 64px rgba(0, 0, 0, 0.55);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1434,7 +1432,6 @@ p {
   color: rgba(255, 255, 255, 0.88);
   letter-spacing: 0.02em;
   line-height: 1.35;
-  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.45);
 }
 
 .participant-assigned-team strong {
