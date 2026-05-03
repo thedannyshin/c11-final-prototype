@@ -1,6 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { getDatabase, ref as dbRef, onValue, set, serverTimestamp } from 'firebase/database';
+import {
+  getDatabase,
+  ref as dbRef,
+  onValue,
+  set,
+  update,
+  serverTimestamp,
+  runTransaction,
+} from 'firebase/database';
 import { firebaseApp } from './firebase.js';
 
 const CANVAS_W = 1200;
@@ -8,6 +16,38 @@ const CANVAS_H = 700;
 const DEFAULT_COLOR = '#00D4FF';
 const COLORS = ['#FFFFFF', '#00D4FF', '#F43F5E', '#10B981', '#FBBF24', '#A78BFA'];
 const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
+
+const GAME_ROUND_MS = 2 * 60 * 1000;
+const GAME_POINTS_DRAW = 10;
+const GAME_POINTS_MOVE = 10;
+
+function defaultGameState() {
+  return {
+    phase: 'idle',
+    team1Score: 0,
+    team2Score: 0,
+    roundEndAt: null,
+  };
+}
+
+function normalizeGameState(raw) {
+  if (!raw || typeof raw !== 'object') return defaultGameState();
+  const phase = ['idle', 'team1', 'between', 'team2', 'done'].includes(raw.phase) ? raw.phase : 'idle';
+  return {
+    phase,
+    team1Score: Math.max(0, Number(raw.team1Score) || 0),
+    team2Score: Math.max(0, Number(raw.team2Score) || 0),
+    roundEndAt: raw.roundEndAt == null || raw.roundEndAt === '' ? null : Number(raw.roundEndAt),
+  };
+}
+
+function formatRoundClock(roundEndAt) {
+  if (roundEndAt == null) return '—';
+  const sec = Math.max(0, Math.ceil((roundEndAt - Date.now()) / 1000));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 function mainAquariumWidthPx() {
   return window.innerWidth * (1 - SHOWCASE_WIDTH_FRAC);
@@ -323,6 +363,7 @@ function createTransport(roomId) {
   const strokesRef = dbRef(db, `rooms/${roomId}/strokes`);
   const presenceRef = dbRef(db, `rooms/${roomId}/presence`);
   const settingsBgRef = dbRef(db, `rooms/${roomId}/settings/background`);
+  const gameRef = dbRef(db, `rooms/${roomId}/game`);
   const listeners = new Set();
   const handle = (msg) => listeners.forEach((fn) => fn(msg));
 
@@ -347,6 +388,13 @@ function createTransport(roomId) {
     });
   });
 
+  const unsubGame = onValue(gameRef, (snapshot) => {
+    handle({
+      type: 'room:state',
+      payload: { game: normalizeGameState(snapshot.val()) },
+    });
+  });
+
   return {
     send(message) {
       if (message.type === 'character:add' || message.type === 'stroke:add') {
@@ -361,6 +409,18 @@ function createTransport(roomId) {
           ...message.payload,
           ts: serverTimestamp(),
         });
+      } else if (message.type === 'game:increment') {
+        const { team, delta } = message.payload;
+        runTransaction(gameRef, (curr) => {
+          const g = normalizeGameState(curr);
+          if (team === 1) g.team1Score = (g.team1Score || 0) + delta;
+          else if (team === 2) g.team2Score = (g.team2Score || 0) + delta;
+          return g;
+        });
+      } else if (message.type === 'game:update') {
+        update(gameRef, message.payload);
+      } else if (message.type === 'game:set') {
+        set(gameRef, message.payload);
       }
     },
     subscribe(fn) {
@@ -373,6 +433,7 @@ function createTransport(roomId) {
       unsubStrokes();
       unsubPresence();
       unsubSettingsBg();
+      unsubGame();
       listeners.clear();
     },
   };
@@ -587,7 +648,10 @@ function useSharedRoom(roomId, client) {
   const [strokes, setStrokes] = useState([]);
   const [participants, setParticipants] = useState({});
   const [roomBackground, setRoomBackgroundState] = useState('water');
+  const [game, setGame] = useState(defaultGameState);
   const transportRef = useRef(null);
+  const gameRef = useRef(game);
+  gameRef.current = game;
 
   useEffect(() => {
     if (!roomId) return undefined;
@@ -596,6 +660,7 @@ function useSharedRoom(roomId, client) {
     setStrokes([]);
     setParticipants({});
     setRoomBackgroundState('water');
+    setGame(defaultGameState());
 
     const transport = createTransport(roomId);
     transportRef.current = transport;
@@ -634,6 +699,9 @@ function useSharedRoom(roomId, client) {
         if (message.payload.roomBackground !== undefined) {
           setRoomBackgroundState(normalizeRoomBackground(message.payload.roomBackground));
         }
+        if (message.payload.game !== undefined) {
+          setGame(normalizeGameState(message.payload.game));
+        }
       }
     });
 
@@ -670,10 +738,16 @@ function useSharedRoom(roomId, client) {
     transportRef.current.writeState({ strokes, participants });
   }, [roomId, strokes, participants]);
 
+  const sendCanvasClear = useCallback(() => {
+    setStrokes([]);
+    transportRef.current?.send({ type: 'canvas:clear', clientId: client.clientId, payload: null });
+  }, [client.clientId]);
+
   return useMemo(() => ({
     strokes,
     participants,
     roomBackground,
+    game,
     addCharacter(character) {
       setStrokes((prev) => {
         if (prev.some((s) => s.id === character.id)) return prev;
@@ -684,10 +758,78 @@ function useSharedRoom(roomId, client) {
         clientId: client.clientId,
         payload: character,
       });
+      const g = gameRef.current;
+      if (g.phase === 'team1') {
+        transportRef.current?.send({
+          type: 'game:increment',
+          payload: { team: 1, delta: GAME_POINTS_DRAW },
+        });
+      } else if (g.phase === 'team2') {
+        transportRef.current?.send({
+          type: 'game:increment',
+          payload: { team: 2, delta: GAME_POINTS_DRAW },
+        });
+      }
     },
-    clearCanvas() {
-      setStrokes([]);
-      transportRef.current?.send({ type: 'canvas:clear', clientId: client.clientId, payload: null });
+    clearCanvas: sendCanvasClear,
+    awardRelocatePoints() {
+      const g = gameRef.current;
+      if (g.phase === 'team1') {
+        transportRef.current?.send({
+          type: 'game:increment',
+          payload: { team: 1, delta: GAME_POINTS_MOVE },
+        });
+      } else if (g.phase === 'team2') {
+        transportRef.current?.send({
+          type: 'game:increment',
+          payload: { team: 2, delta: GAME_POINTS_MOVE },
+        });
+      }
+    },
+    gameStartTeam1() {
+      sendCanvasClear();
+      transportRef.current?.send({
+        type: 'game:set',
+        payload: {
+          phase: 'team1',
+          team1Score: 0,
+          team2Score: 0,
+          roundEndAt: Date.now() + GAME_ROUND_MS,
+        },
+      });
+    },
+    gameStartTeam2() {
+      sendCanvasClear();
+      transportRef.current?.send({
+        type: 'game:update',
+        payload: {
+          phase: 'team2',
+          roundEndAt: Date.now() + GAME_ROUND_MS,
+        },
+      });
+    },
+    gameEndActiveRound() {
+      const g = gameRef.current;
+      if (g.phase === 'team1') {
+        sendCanvasClear();
+        transportRef.current?.send({
+          type: 'game:update',
+          payload: { phase: 'between', roundEndAt: null },
+        });
+      } else if (g.phase === 'team2') {
+        sendCanvasClear();
+        transportRef.current?.send({
+          type: 'game:update',
+          payload: { phase: 'done', roundEndAt: null },
+        });
+      }
+    },
+    gameResetMatch() {
+      sendCanvasClear();
+      transportRef.current?.send({
+        type: 'game:set',
+        payload: defaultGameState(),
+      });
     },
     setRoomBackground(bg) {
       const b = normalizeRoomBackground(bg);
@@ -698,7 +840,7 @@ function useSharedRoom(roomId, client) {
         payload: b,
       });
     },
-  }), [strokes, participants, roomBackground, client.clientId]);
+  }), [strokes, participants, roomBackground, game, client.clientId, sendCanvasClear]);
 }
 
 
@@ -1196,6 +1338,29 @@ function DrawingPad({ onCommit }) {
 // ---------------------------------------------------------------------------
 function HostView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
+  const sharedRef = useRef(shared);
+  useEffect(() => {
+    sharedRef.current = shared;
+  }, [shared]);
+
+  const [, forceClockTick] = useState(0);
+  useEffect(() => {
+    if (shared.game.phase !== 'team1' && shared.game.phase !== 'team2') return undefined;
+    if (!shared.game.roundEndAt) return undefined;
+    const id = window.setInterval(() => forceClockTick((n) => n + 1), 250);
+    return () => window.clearInterval(id);
+  }, [shared.game.phase, shared.game.roundEndAt]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const { game } = sharedRef.current;
+      if (game.phase !== 'team1' && game.phase !== 'team2') return;
+      if (!game.roundEndAt || Date.now() < game.roundEndAt) return;
+      sharedRef.current.gameEndActiveRound();
+    }, 400);
+    return () => window.clearInterval(id);
+  }, []);
+
   const [playing, setPlaying] = useState(false);
   const [musicVolume, setMusicVolume] = useState(() => {
     try {
@@ -1395,6 +1560,7 @@ function HostView({ room, shared, onResetRoom }) {
           ]);
           hiddenIdsRef.current = new Set([...hiddenIdsRef.current, id]);
           setHiddenIds(new Set(hiddenIdsRef.current));
+          sharedRef.current.awardRelocatePoints();
         }
       } else if (pos) {
         // Dropped in main aquarium — teleport creature to drop position.
@@ -1455,12 +1621,73 @@ function HostView({ room, shared, onResetRoom }) {
 
   const visibleStrokes = shared.strokes.filter((s) => !hiddenIds.has(s.id));
 
+  const g = shared.game;
+  const phaseLabel =
+    g.phase === 'idle'
+      ? 'Ready'
+      : g.phase === 'team1'
+        ? 'Team 1 playing'
+        : g.phase === 'between'
+          ? 'Between rounds'
+          : g.phase === 'team2'
+            ? 'Team 2 playing'
+            : 'Match over';
+  const winnerText =
+    g.phase === 'done'
+      ? g.team1Score === g.team2Score
+        ? 'Tie game!'
+        : g.team1Score > g.team2Score
+          ? 'Team 1 wins!'
+          : 'Team 2 wins!'
+      : '';
+
   return (
     <div
       className={`host-fullscreen${hudIdleHidden ? ' host-fullscreen--ui-idle' : ''}`}
       ref={hostRootRef}
     >
       <audio ref={audioRef} loop preload="metadata" />
+
+      <div className="host-game-bar" aria-live="polite">
+        <div className="host-game-scores">
+          <span className="host-game-score">
+            <span className="host-game-score-label">Team 1</span>
+            <span className="host-game-score-val">{g.team1Score}</span>
+          </span>
+          <span className="host-game-score">
+            <span className="host-game-score-label">Team 2</span>
+            <span className="host-game-score-val">{g.team2Score}</span>
+          </span>
+        </div>
+        <div className="host-game-center">
+          <span className="host-game-phase">{phaseLabel}</span>
+          {(g.phase === 'team1' || g.phase === 'team2') && g.roundEndAt ? (
+            <span className="host-game-timer">{formatRoundClock(g.roundEndAt)}</span>
+          ) : null}
+          {winnerText ? <span className="host-game-winner">{winnerText}</span> : null}
+        </div>
+        <div className="host-game-actions">
+          <button
+            type="button"
+            className="host-game-btn"
+            disabled={g.phase !== 'idle' && g.phase !== 'done'}
+            onClick={() => shared.gameStartTeam1()}
+          >
+            Start team 1
+          </button>
+          <button
+            type="button"
+            className="host-game-btn"
+            disabled={g.phase !== 'between'}
+            onClick={() => shared.gameStartTeam2()}
+          >
+            Start team 2
+          </button>
+          <button type="button" className="host-game-btn host-game-btn--ghost" onClick={() => shared.gameResetMatch()}>
+            Reset
+          </button>
+        </div>
+      </div>
 
       <div className="host-layout">
         <div className="aquarium-wrapper">
@@ -1603,10 +1830,10 @@ function HostView({ room, shared, onResetRoom }) {
 }
 
 const PARTICIPANT_HOW_TO_STEPS = [
-  'Organize into 2 teams of 2. One team member (the clocker) will sit in front of the webcam. The other team member (the artist) will scan the QR.',
-  'The QR code will take the artist to a drawing page. Choose the background, and start drawing things as fast as you can!',
-  'These drawings will be dropped into the displayed environment. The clocker will have to drag those drawings into the designated area in the panel on the right by using a pinching gesture. You will get more points if you are both fast and accurate!',
-  'After the timer is up, the second team will repeat the same process. The team with the highest score wins!',
+  `Two teams take turns. Each team has one person at the big screen (pinch-drag creatures into the right panel) and one artist on a phone.`,
+  `Team 1 plays for 2 minutes, then Team 2 plays for 2 minutes. The host starts each round—only the active team scores.`,
+  `Sending a drawing earns ${GAME_POINTS_DRAW} points for the active team. Moving a creature into the right panel earns ${GAME_POINTS_MOVE} points.`,
+  'Highest total score after both rounds wins!',
 ];
 
 function ParticipantHowToModal({ open, onClose }) {
@@ -1669,6 +1896,26 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
   const [howToOpen, setHowToOpen] = useState(false);
   const scene = normalizeRoomBackground(shared.roomBackground);
   const bgUrl = HOST_BG_BY_SCENE[scene] ?? HOST_BG_BY_SCENE.water;
+  const gm = shared.game;
+
+  const [, forceClockTick] = useState(0);
+  useEffect(() => {
+    if (gm.phase !== 'team1' && gm.phase !== 'team2') return undefined;
+    if (!gm.roundEndAt) return undefined;
+    const id = window.setInterval(() => forceClockTick((n) => n + 1), 250);
+    return () => window.clearInterval(id);
+  }, [gm.phase, gm.roundEndAt]);
+
+  const phonePhase =
+    gm.phase === 'idle'
+      ? 'Waiting for host'
+      : gm.phase === 'team1'
+        ? 'Team 1 is playing'
+        : gm.phase === 'between'
+          ? 'Between rounds'
+          : gm.phase === 'team2'
+            ? 'Team 2 is playing'
+            : 'Match finished';
 
   return (
     <div
@@ -1677,6 +1924,15 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
       style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
     >
       <ParticipantHowToModal open={howToOpen} onClose={() => setHowToOpen(false)} />
+      <div className="participant-game-banner">
+        <span className="participant-game-phase">{phonePhase}</span>
+        {(gm.phase === 'team1' || gm.phase === 'team2') && gm.roundEndAt ? (
+          <span className="participant-game-timer">{formatRoundClock(gm.roundEndAt)}</span>
+        ) : null}
+        <span className="participant-game-scores">
+          T1 {gm.team1Score} · T2 {gm.team2Score}
+        </span>
+      </div>
       <div className="participant-header">
         <span className="participant-room-code">{room}</span>
         <div className="participant-scene-wrap">
