@@ -1975,19 +1975,32 @@ function HostView({ room, shared, onResetRoom }) {
           aria-label="ClockIt — roles and QR for artists"
         >
           <div className="host-flow-inner host-flow-inner--splash-card">
-            <div className="host-flow-splash-hero">
-              <div className="host-flow-splash-hero-main">
-                <ClockItLogo />
-                <div className="host-flow-splash-copy">
-                  <p className="host-flow-splash-lead host-flow-splash-lead--head">2 teams · 2 players each</p>
-                  <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
-                  <p className="host-flow-splash-lead">Artist → scan the QR to join</p>
-                </div>
-              </div>
-              <div className="host-flow-splash-qr" aria-label="QR code to join as artist">
-                <QRCodeSVG value={joinUrl} size={118} bgColor="#ffffff" fgColor="#000000" />
-                <span className="host-flow-splash-qr-hint">Scan</span>
-              </div>
+            <ClockItLogo />
+            <div className="host-flow-splash-copy">
+              <p className="host-flow-splash-lead host-flow-splash-lead--head">2 teams · 2 players each</p>
+              <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
+              <p className="host-flow-splash-lead">Artist → scan the QR below</p>
+            </div>
+            <div className="host-flow-qr">
+              <span className="host-flow-qr-badge" aria-hidden="true">
+                Join!
+              </span>
+              <QRCodeSVG
+                className="host-flow-qr-svg"
+                value={joinUrl}
+                size={156}
+                level="H"
+                marginSize={1}
+                bgColor="transparent"
+                fgColor="#f5ffff"
+                title="Scan to join this ClockIt room"
+                imageSettings={{
+                  src: CLOCKIT_LOGO_PATH,
+                  height: 28,
+                  width: 28,
+                  excavate: true,
+                }}
+              />
             </div>
             <div className="host-flow-scene">
               <p className="host-flow-scene-heading" id="host-splash-scene-label">

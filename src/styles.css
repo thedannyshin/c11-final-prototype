@@ -641,75 +641,6 @@ p {
   max-width: min(92vw, 27rem);
 }
 
-.host-flow-inner.host-flow-inner--splash-card {
-  gap: 14px;
-}
-
-/* Logo + copy beside QR — shorter than stacking QR under instructions */
-.host-flow-splash-hero {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  justify-content: center;
-  gap: clamp(12px, 3vw, 20px);
-  width: 100%;
-}
-
-.host-flow-splash-hero-main {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.host-flow-splash-hero-main .clockit-logo {
-  width: clamp(8.5rem, 36vw, 15rem);
-  max-width: 100%;
-}
-
-.host-flow-splash-qr {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding-top: 4px;
-}
-
-.host-flow-splash-qr svg {
-  display: block;
-  border-radius: 10px;
-  padding: 4px;
-  box-sizing: content-box;
-  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
-}
-
-.host-flow-splash-qr-hint {
-  margin: 0;
-  font-size: clamp(0.62rem, 1.8vw, 0.72rem);
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-@media (max-width: 380px) {
-  .host-flow-splash-hero {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .host-flow-splash-hero-main .clockit-logo {
-    width: clamp(9rem, 42vw, 18rem);
-  }
-
-  .host-flow-splash-qr {
-    padding-top: 0;
-  }
-}
-
 /* PNG logo — width-only scaling; height: auto keeps file aspect ratio */
 .clockit-logo {
   display: block;
@@ -766,13 +697,58 @@ p {
   letter-spacing: 0.02em;
 }
 
+.host-flow-qr {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 13px;
+  margin: 2px 0 0;
+  border-radius: 22px;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.26) 0%,
+    rgba(0, 212, 255, 0.1) 42%,
+    rgba(167, 139, 250, 0.14) 100%
+  );
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.42),
+    0 10px 36px rgba(0, 8, 22, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+.host-flow-qr-badge {
+  position: absolute;
+  top: -7px;
+  right: -6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: clamp(0.62rem, 1.8vw, 0.72rem);
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #07242e;
+  background: linear-gradient(135deg, #9ef6ff 0%, #c4b5fd 55%, #fde68a 100%);
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  transform: rotate(7deg);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.host-flow-qr-svg {
+  display: block;
+  filter: drop-shadow(0 2px 16px rgba(0, 212, 255, 0.28));
+}
+
 .host-flow-scene {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
   width: 100%;
-  margin-top: 0;
+  margin-top: 12px;
 }
 
 .host-flow-scene-heading {
