@@ -2368,11 +2368,13 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
             </div>
           </div>
           {!myTurnToDraw ? (
-            <div className="participant-sitout-card">
-              <p className="participant-sitout-title">Team {gm.phase === 'team1' ? 1 : 2}&apos;s draw round</p>
-              <p className="participant-sitout-copy">
-                You&apos;re on Team {assignedTeam}. This timed round is for the other pair — watch the main screen until
-                it&apos;s your team&apos;s turn.
+            <div
+              className="participant-flow-overlay participant-flow-overlay--splash participant-flow-overlay--results"
+              aria-live="polite"
+            >
+              <ClockItLogo variant="phone" />
+              <p className="participant-flow-results-title">
+                Team {gm.phase === 'team1' ? 1 : 2}&apos;s turn
               </p>
             </div>
           ) : (
