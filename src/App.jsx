@@ -36,6 +36,18 @@ function normalizeRoomBackground(v) {
   return 'water';
 }
 
+/** Load + decode all scene images so participant/host switches hit cache (important on mobile). */
+function preloadSceneBackgroundArt() {
+  Object.values(HOST_BG_BY_SCENE).forEach((src) => {
+    const img = new Image();
+    img.onload = () => {
+      img.decode?.().catch(() => {});
+    };
+    img.onerror = () => {};
+    img.src = src;
+  });
+}
+
 function getBrowserFullscreenElement() {
   return document.fullscreenElement ?? document.webkitFullscreenElement ?? null;
 }
@@ -1757,6 +1769,10 @@ export default function App() {
   const clientColor = useMemo(() => COLORS[Math.floor(Math.random() * COLORS.length)], []);
 
   useEffect(() => { setUrlState({ room, mode }); }, [room, mode]);
+
+  useEffect(() => {
+    preloadSceneBackgroundArt();
+  }, []);
 
   const shared = useSharedRoom(room, {
     clientId,
