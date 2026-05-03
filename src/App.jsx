@@ -105,10 +105,10 @@ function mainAquariumWidthPx() {
   return window.innerWidth * (1 - SHOWCASE_WIDTH_FRAC);
 }
 
-/** Host screen background art (see /public/bg-*.png). */
+/** Host screen background art in /public — all scenes are 1920×1240 (~1.55:1) for consistent sizing. */
 const HOST_BG_BY_SCENE = {
   water: '/bg-water.png',
-  grass: '/bg-grass.jpg',
+  grass: '/bg-grass.png',
   stars: '/bg-starry.jpg',
 };
 /** Looping ambience per big-screen scene (files in /public). */
