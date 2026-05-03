@@ -16,8 +16,8 @@ function mainAquariumWidthPx() {
 /** Host screen background art (see /public/bg-*.png). */
 const HOST_BG_BY_SCENE = {
   water: '/bg-water.png',
-  grass: '/bg-grass.png',
-  stars: '/bg-starry.png',
+  grass: '/bg-grass.jpg',
+  stars: '/bg-starry.jpg',
 };
 /** Looping ambience per big-screen scene (files in /public). */
 const HOST_MUSIC_BY_SCENE = {
