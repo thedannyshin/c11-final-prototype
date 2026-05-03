@@ -1490,6 +1490,9 @@ function HostView({ room, shared, onResetRoom }) {
   const [hostFullscreen, setHostFullscreen] = useState(false);
   const [hudIdleHidden, setHudIdleHidden] = useState(false);
   const [howToOpen, setHowToOpen] = useState(false);
+  const [splashBgChosen, setSplashBgChosen] = useState(false);
+  const [splashRotateIdx, setSplashRotateIdx] = useState(0);
+  const prevPhaseForSplashRef = useRef(shared.game.phase);
   const hudIdleTimerRef = useRef(null);
 
   musicVolumeRef.current = musicVolume;
@@ -1687,8 +1690,30 @@ function HostView({ room, shared, onResetRoom }) {
     };
   }, []);
 
-  const musicSrc =
-    HOST_MUSIC_BY_SCENE[normalizeRoomBackground(shared.roomBackground)] ?? HOST_MUSIC_BY_SCENE.water;
+  const gPhase = shared.game.phase;
+
+  useEffect(() => {
+    if (gPhase === 'splash' && prevPhaseForSplashRef.current !== 'splash') {
+      setSplashBgChosen(false);
+      setSplashRotateIdx(0);
+    }
+    prevPhaseForSplashRef.current = gPhase;
+  }, [gPhase]);
+
+  useEffect(() => {
+    if (gPhase !== 'splash' || splashBgChosen) return undefined;
+    const t = window.setInterval(() => {
+      setSplashRotateIdx((i) => (i + 1) % HOST_SCENE_OPTIONS.length);
+    }, 4500);
+    return () => window.clearInterval(t);
+  }, [gPhase, splashBgChosen]);
+
+  const displayScene =
+    gPhase === 'splash' && !splashBgChosen
+      ? HOST_SCENE_OPTIONS[splashRotateIdx].id
+      : normalizeRoomBackground(shared.roomBackground);
+
+  const musicSrc = HOST_MUSIC_BY_SCENE[displayScene] ?? HOST_MUSIC_BY_SCENE.water;
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -1748,7 +1773,7 @@ function HostView({ room, shared, onResetRoom }) {
 
       {g.phase === 'splash' ? (
         <div className="host-flow-overlay host-flow-overlay--splash" aria-label="ClockIt start">
-          <div className="host-flow-inner">
+          <div className="host-flow-inner host-flow-inner--splash-card">
             <p className="clockit-wordmark">ClockIt</p>
             <p className="host-flow-subtitle">Scan to join this room</p>
             <QRCodeSVG value={joinUrl} size={200} bgColor="#ffffff" fgColor="#050e18" />
@@ -1756,10 +1781,18 @@ function HostView({ room, shared, onResetRoom }) {
               <select
                 id="host-splash-scene"
                 className="host-flow-scene-select"
-                value={shared.roomBackground}
-                onChange={(e) => shared.setRoomBackground(e.target.value)}
+                value={splashBgChosen ? normalizeRoomBackground(shared.roomBackground) : ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  shared.setRoomBackground(v);
+                  setSplashBgChosen(true);
+                }}
                 aria-label="Background for the big screen"
               >
+                <option value="" disabled>
+                  Select a Background
+                </option>
                 {HOST_SCENE_OPTIONS.map(({ id, label }) => (
                   <option key={id} value={id}>
                     {label}
@@ -1767,12 +1800,20 @@ function HostView({ room, shared, onResetRoom }) {
                 ))}
               </select>
             </div>
-            <button type="button" className="host-flow-howto" onClick={() => setHowToOpen(true)}>
-              How to play
-            </button>
-            <button type="button" className="host-flow-play" onClick={() => shared.gamePlayFromSplash()}>
-              Play
-            </button>
+            <div className="host-flow-actions">
+              <button type="button" className="host-flow-action-btn" onClick={() => setHowToOpen(true)}>
+                Instructions
+              </button>
+              <button
+                type="button"
+                className="host-flow-action-btn"
+                disabled={!splashBgChosen}
+                title={splashBgChosen ? undefined : 'Select a background first'}
+                onClick={() => shared.gamePlayFromSplash()}
+              >
+                Play
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -1866,12 +1907,12 @@ function HostView({ room, shared, onResetRoom }) {
             heldPosRef={heldPosRef}
             positionsRef={creaturePositionsRef}
             teleportRef={teleportRef}
-            scene={shared.roomBackground}
+            scene={displayScene}
           />
         </div>
         <SideAquarium
           creatures={sideCreatures}
-          scene={shared.roomBackground}
+          scene={displayScene}
           onReleaseAll={() => {
             setSideCreatures([]);
             hiddenIdsRef.current = new Set();
@@ -1987,7 +2028,7 @@ function HostView({ room, shared, onResetRoom }) {
 
       {g.phase !== 'splash' ? (
         <button type="button" className="host-howto-floating" onClick={() => setHowToOpen(true)}>
-          How to play
+          Instructions
         </button>
       ) : null}
 
@@ -2055,7 +2096,7 @@ function HowToPlayModal({ open, onClose }) {
             ×
           </button>
         </div>
-        <h3 className="howto-modal-subtitle">How to play</h3>
+        <h3 className="howto-modal-subtitle">Instructions</h3>
         <ol className="howto-modal-list">
           {GAME_HOW_TO_STEPS.map((text, i) => (
             <li key={i}>{text}</li>
