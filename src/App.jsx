@@ -1805,21 +1805,21 @@ function HostView({ room, shared, onResetRoom }) {
       ) : null}
 
       {showPlayHud ? (
-        <div className="host-game-bar host-game-bar--compact" aria-live="polite">
-          <div className="host-game-scores">
-            <span className="host-game-score">
-              <span className="host-game-score-label">Team 1</span>
-              <span className="host-game-score-val">{g.team1Score}</span>
-            </span>
-            <span className="host-game-score">
-              <span className="host-game-score-label">Team 2</span>
-              <span className="host-game-score-val">{g.team2Score}</span>
-            </span>
+        <div className="host-play-overlay" aria-live="polite">
+          <p className={`host-play-active${g.phase === 'team1' ? ' is-team1' : ' is-team2'}`}>
+            {g.phase === 'team1' ? 'Team 1' : 'Team 2'}
+          </p>
+          <div className="host-play-scores">
+            <div className={`host-play-score-block${g.phase === 'team1' ? ' is-team1-active' : ''}`}>
+              <span className="host-play-score-label">Team 1</span>
+              <span className="host-play-score-num">{g.team1Score}</span>
+            </div>
+            <div className={`host-play-score-block${g.phase === 'team2' ? ' is-team2-active' : ''}`}>
+              <span className="host-play-score-label">Team 2</span>
+              <span className="host-play-score-num">{g.team2Score}</span>
+            </div>
           </div>
-          <div className="host-game-center">
-            <span className="host-game-phase">{g.phase === 'team1' ? 'Team 1 — Go!' : 'Team 2 — Go!'}</span>
-            {g.roundEndAt ? <span className="host-game-timer">{formatRoundClock(g.roundEndAt)}</span> : null}
-          </div>
+          {g.roundEndAt ? <p className="host-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
         </div>
       ) : null}
 
@@ -1846,6 +1846,7 @@ function HostView({ room, shared, onResetRoom }) {
         />
       </div>
 
+      {!showPlayHud ? (
       <div
         className={`host-hud${hudIdleHidden ? ' host-hud--idle-hidden' : ''}`}
         aria-hidden={hudIdleHidden}
@@ -1944,8 +1945,9 @@ function HostView({ room, shared, onResetRoom }) {
           </select>
         </div>
       </div>
+      ) : null}
 
-      {g.phase !== 'splash' ? (
+      {g.phase !== 'splash' && !showPlayHud ? (
         <div className="qr-corner">
           <div className="qr-label">Scan to join</div>
           <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
@@ -2036,14 +2038,6 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
   const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
   const cdPhone = getCountdownDisplay(gm);
 
-  const [, forceClockTick] = useState(0);
-  useEffect(() => {
-    if (gm.phase !== 'team1' && gm.phase !== 'team2') return undefined;
-    if (!gm.roundEndAt) return undefined;
-    const id = window.setInterval(() => forceClockTick((n) => n + 1), 250);
-    return () => window.clearInterval(id);
-  }, [gm.phase, gm.roundEndAt]);
-
   return (
     <div
       className="participant-shell"
@@ -2109,15 +2103,6 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
 
       {inDrawRound ? (
         <>
-          <div className="participant-game-banner">
-            <span className="participant-game-phase">{gm.phase === 'team1' ? 'Team 1 — draw!' : 'Team 2 — draw!'}</span>
-            {gm.roundEndAt ? (
-              <span className="participant-game-timer">{formatRoundClock(gm.roundEndAt)}</span>
-            ) : null}
-            <span className="participant-game-scores">
-              T1 {gm.team1Score} · T2 {gm.team2Score}
-            </span>
-          </div>
           <div className="participant-header">
             <span className="participant-room-code">{room}</span>
             <div className="participant-scene-wrap">

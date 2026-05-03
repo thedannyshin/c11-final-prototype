@@ -416,10 +416,97 @@ p {
   color: rgba(255, 255, 255, 0.55);
 }
 
-.host-game-bar--compact {
-  max-width: min(96vw, 520px);
-  padding: 8px 14px;
-  gap: 8px 12px;
+/* During team1/team2: only big scores + timer (pointer-events none — game underneath). */
+.host-play-overlay {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  width: min(96vw, 920px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 2vw, 20px);
+  pointer-events: none;
+  text-align: center;
+}
+
+.host-play-active {
+  margin: 0;
+  font-size: clamp(2.75rem, 8vw, 5.5rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 4px 40px rgba(0, 0, 0, 0.6);
+}
+
+.host-play-active.is-team1 {
+  color: rgba(0, 212, 255, 0.98);
+  text-shadow: 0 0 48px rgba(0, 212, 255, 0.35);
+}
+
+.host-play-active.is-team2 {
+  color: rgba(254, 240, 138, 0.98);
+  text-shadow: 0 0 48px rgba(254, 240, 138, 0.2);
+}
+
+.host-play-scores {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(16px, 5vw, 48px);
+}
+
+.host-play-score-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: clamp(6rem, 18vw, 12rem);
+  padding: clamp(10px, 2vw, 16px) clamp(14px, 3vw, 28px);
+  border-radius: 20px;
+  background: rgba(5, 14, 28, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.host-play-score-block.is-team1-active {
+  border-color: rgba(0, 212, 255, 0.55);
+  background: rgba(0, 212, 255, 0.12);
+  box-shadow: 0 0 32px rgba(0, 212, 255, 0.15);
+}
+
+.host-play-score-block.is-team2-active {
+  border-color: rgba(254, 240, 138, 0.45);
+  background: rgba(254, 240, 138, 0.08);
+  box-shadow: 0 0 32px rgba(254, 240, 138, 0.12);
+}
+
+.host-play-score-label {
+  font-size: clamp(0.7rem, 1.8vw, 0.95rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.host-play-score-num {
+  font-size: clamp(2.5rem, 9vw, 5rem);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.98);
+}
+
+.host-play-timer {
+  margin: 0;
+  font-size: clamp(3rem, 11vw, 7rem);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.98);
+  text-shadow: 0 4px 36px rgba(0, 0, 0, 0.55);
 }
 
 /* Full-screen game flow (splash, countdown, results, final) */
@@ -1072,38 +1159,6 @@ p {
     linear-gradient(to bottom, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.76)),
     linear-gradient(to bottom, rgba(0, 0, 0, 0) 52%, rgba(5, 10, 22, 0.58) 100%),
     var(--participant-shell-bg);
-}
-
-.participant-game-banner {
-  flex-shrink: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 14px;
-  padding: 8px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(5, 14, 28, 0.45);
-  font-size: 0.8125rem;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.participant-game-phase {
-  font-weight: 600;
-}
-
-.participant-game-timer {
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.05em;
-  color: rgba(0, 212, 255, 0.92);
-}
-
-.participant-game-scores {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 0.75rem;
 }
 
 .participant-header {
