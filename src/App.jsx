@@ -192,31 +192,40 @@ function preloadSceneBackgroundArt() {
 
 /** Phone splash / join landing: cycles scene art + crossfade + zoom (not tied to Clocker’s Firebase scene). */
 function ParticipantSplashBackdrop({ active }) {
-  const [idx, setIdx] = useState(0);
-  const [blend, setBlend] = useState(0);
-  /** When false, opacity snaps without transition so the “next” image doesn’t flash in while fading out. */
-  const [opacityTransition, setOpacityTransition] = useState(true);
+  /** Index of the slide shown on the bottom (full-opacity) layer — unchanged during a crossfade. */
+  const [slide, setSlide] = useState(0);
+  /** Top layer opacity: 0 stable, animates 0→1 during crossfade only (bottom never fades or swaps mid-blend). */
+  const [overlayBlend, setOverlayBlend] = useState(0);
+  const [overlayTransition, setOverlayTransition] = useState(true);
+  /** Pause Ken Burns while crossfading / snapping so transform doesn’t fight opacity compositing. */
+  const [zoomPaused, setZoomPaused] = useState(false);
 
   useEffect(() => {
     if (!active) {
-      setIdx(0);
-      setBlend(0);
-      setOpacityTransition(true);
+      setSlide(0);
+      setOverlayBlend(0);
+      setOverlayTransition(true);
+      setZoomPaused(false);
       return undefined;
     }
-    setIdx(0);
-    setBlend(0);
-    setOpacityTransition(true);
+    setSlide(0);
+    setOverlayBlend(0);
+    setOverlayTransition(true);
+    setZoomPaused(false);
     const n = CLOCKER_SCENE_OPTIONS.length;
     const id = window.setInterval(() => {
-      setOpacityTransition(true);
-      setBlend(1);
+      setZoomPaused(true);
+      setOverlayTransition(true);
+      setOverlayBlend(1);
       window.setTimeout(() => {
-        setOpacityTransition(false);
-        setIdx((i) => (i + 1) % n);
-        setBlend(0);
+        setOverlayTransition(false);
+        setSlide((s) => (s + 1) % n);
+        setOverlayBlend(0);
         requestAnimationFrame(() => {
-          setOpacityTransition(true);
+          requestAnimationFrame(() => {
+            setOverlayTransition(true);
+            setZoomPaused(false);
+          });
         });
       }, SPLASH_CROSSFADE_MS);
     }, SPLASH_ZOOM_CYCLE_MS);
@@ -225,37 +234,43 @@ function ParticipantSplashBackdrop({ active }) {
 
   if (!active) return null;
 
-  const tf = opacityTransition
+  const tf = overlayTransition
     ? `opacity ${SPLASH_CROSSFADE_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`
     : 'none';
 
   const n = CLOCKER_SCENE_OPTIONS.length;
-  const sceneBottom = CLOCKER_SCENE_OPTIONS[idx].id;
-  const sceneTop = CLOCKER_SCENE_OPTIONS[(idx + 1) % n].id;
-  const urlBottom = CLOCKER_BG_BY_SCENE[sceneBottom];
-  const urlTop = CLOCKER_BG_BY_SCENE[sceneTop];
+  const baseId = CLOCKER_SCENE_OPTIONS[slide % n].id;
+  const overId = CLOCKER_SCENE_OPTIONS[(slide + 1) % n].id;
+  const baseSrc = CLOCKER_BG_BY_SCENE[baseId];
+  const overSrc = CLOCKER_BG_BY_SCENE[overId];
 
   return (
     <div className="participant-splash-bg" aria-hidden>
-      <div className="participant-splash-bg-zoom">
+      <div
+        className={`participant-splash-bg-zoom${zoomPaused ? ' participant-splash-bg-zoom--paused' : ''}`}
+      >
+        <div className="participant-splash-bg-layer" data-scene={baseId}>
+          <img
+            src={baseSrc}
+            alt=""
+            className="participant-splash-bg-img"
+            draggable={false}
+            decoding="async"
+          />
+        </div>
         <div
-          className="participant-splash-bg-layer"
-          data-scene={sceneBottom}
-          style={{
-            opacity: 1 - blend,
-            backgroundImage: `url('${urlBottom}')`,
-            transition: tf,
-          }}
-        />
-        <div
-          className="participant-splash-bg-layer"
-          data-scene={sceneTop}
-          style={{
-            opacity: blend,
-            backgroundImage: `url('${urlTop}')`,
-            transition: tf,
-          }}
-        />
+          className="participant-splash-bg-layer participant-splash-bg-layer--overlay"
+          data-scene={overId}
+          style={{ opacity: overlayBlend, transition: tf }}
+        >
+          <img
+            src={overSrc}
+            alt=""
+            className="participant-splash-bg-img"
+            draggable={false}
+            decoding="async"
+          />
+        </div>
       </div>
     </div>
   );
