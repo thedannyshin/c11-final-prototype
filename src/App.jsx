@@ -39,6 +39,42 @@ const GAME_PHASES = [
   'final',
 ];
 
+/** Big-screen role in the URL (?mode=clocker). Legacy ?mode=host is still accepted. */
+const CLOCKER_URL_MODE = 'clocker';
+
+const CLOCKER_MUSIC_VOL_KEY = 'clockerMusicVolume';
+const LEGACY_HOST_MUSIC_VOL_KEY = 'hostMusicVolume';
+const CLOCKER_VIDEO_DEVICE_KEY = 'clockerVideoDeviceId';
+const LEGACY_HOST_VIDEO_DEVICE_KEY = 'hostVideoDeviceId';
+
+function readStoredMusicVolume() {
+  try {
+    let raw = sessionStorage.getItem(CLOCKER_MUSIC_VOL_KEY);
+    if (raw == null) {
+      raw = sessionStorage.getItem(LEGACY_HOST_MUSIC_VOL_KEY);
+      if (raw != null) sessionStorage.setItem(CLOCKER_MUSIC_VOL_KEY, raw);
+    }
+    if (raw == null) return 1;
+    const v = parseFloat(raw);
+    return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
+  } catch (_) {
+    return 1;
+  }
+}
+
+function readStoredVideoDeviceId() {
+  try {
+    let v = sessionStorage.getItem(CLOCKER_VIDEO_DEVICE_KEY);
+    if (v == null || v === '') {
+      v = sessionStorage.getItem(LEGACY_HOST_VIDEO_DEVICE_KEY) || '';
+      if (v) sessionStorage.setItem(CLOCKER_VIDEO_DEVICE_KEY, v);
+    }
+    return v || '';
+  } catch (_) {
+    return '';
+  }
+}
+
 function defaultGameState() {
   return {
     phase: 'splash',
@@ -112,25 +148,25 @@ function mainAquariumWidthPx() {
   return window.innerWidth * (1 - SHOWCASE_WIDTH_FRAC);
 }
 
-/** Host screen background art in /public — all scenes are 1920×1240 (~1.55:1) for consistent sizing. */
-const HOST_BG_BY_SCENE = {
+/** Clocker (big screen) background art in /public — all scenes are 1920×1240 (~1.55:1) for consistent sizing. */
+const CLOCKER_BG_BY_SCENE = {
   water: '/bg-water.png',
   grass: '/bg-grass.png',
   stars: '/bg-starry.jpg',
 };
 /** Looping ambience per big-screen scene (files in /public). */
-const HOST_MUSIC_BY_SCENE = {
+const CLOCKER_MUSIC_BY_SCENE = {
   water: '/under-the-sea.mp3',
   grass: '/grass.mp3',
   stars: '/starry-sky.mp3',
 };
-const HOST_SCENE_OPTIONS = [
+const CLOCKER_SCENE_OPTIONS = [
   { id: 'water', label: 'Aquarium' },
   { id: 'grass', label: 'Grass' },
   { id: 'stars', label: 'Starry sky' },
 ];
 
-/** Crossfade / zoom / rotate timing — host AquariumCanvas splash + phone splash backdrop */
+/** Crossfade / zoom / rotate timing — Clocker AquariumCanvas splash + phone splash backdrop */
 const SPLASH_CROSSFADE_MS = 1100;
 const SPLASH_ZOOM_CYCLE_MS = 4500;
 const SPLASH_ZOOM_AMOUNT = 0.07;
@@ -140,9 +176,9 @@ function normalizeRoomBackground(v) {
   return 'water';
 }
 
-/** Load + decode all scene images so participant/host switches hit cache (important on mobile). */
+/** Load + decode all scene images so participant/Clocker switches hit cache (important on mobile). */
 function preloadSceneBackgroundArt() {
-  Object.values(HOST_BG_BY_SCENE).forEach((src) => {
+  Object.values(CLOCKER_BG_BY_SCENE).forEach((src) => {
     const img = new Image();
     img.onload = () => {
       img.decode?.().catch(() => {});
@@ -154,7 +190,7 @@ function preloadSceneBackgroundArt() {
   logo.src = CLOCKIT_LOGO_PATH;
 }
 
-/** Phone splash: cycles scene art + crossfade + zoom until host locks a background in Firebase. */
+/** Phone splash: cycles scene art + crossfade + zoom until Clocker locks a background in Firebase. */
 function ParticipantSplashBackdrop({ active, lockedSceneId }) {
   const [idx, setIdx] = useState(0);
   const [blend, setBlend] = useState(0);
@@ -172,7 +208,7 @@ function ParticipantSplashBackdrop({ active, lockedSceneId }) {
     const id = window.setInterval(() => {
       setBlend(1);
       window.setTimeout(() => {
-        setIdx((i) => (i + 1) % HOST_SCENE_OPTIONS.length);
+        setIdx((i) => (i + 1) % CLOCKER_SCENE_OPTIONS.length);
         setBlend(0);
       }, SPLASH_CROSSFADE_MS);
     }, SPLASH_ZOOM_CYCLE_MS);
@@ -193,7 +229,7 @@ function ParticipantSplashBackdrop({ active, lockedSceneId }) {
             data-scene={id}
             style={{
               opacity: 1,
-              backgroundImage: `url('${HOST_BG_BY_SCENE[id]}')`,
+              backgroundImage: `url('${CLOCKER_BG_BY_SCENE[id]}')`,
             }}
           />
         </div>
@@ -201,11 +237,11 @@ function ParticipantSplashBackdrop({ active, lockedSceneId }) {
     );
   }
 
-  const n = HOST_SCENE_OPTIONS.length;
-  const sceneBottom = HOST_SCENE_OPTIONS[idx].id;
-  const sceneTop = HOST_SCENE_OPTIONS[(idx + 1) % n].id;
-  const urlBottom = HOST_BG_BY_SCENE[sceneBottom];
-  const urlTop = HOST_BG_BY_SCENE[sceneTop];
+  const n = CLOCKER_SCENE_OPTIONS.length;
+  const sceneBottom = CLOCKER_SCENE_OPTIONS[idx].id;
+  const sceneTop = CLOCKER_SCENE_OPTIONS[(idx + 1) % n].id;
+  const urlBottom = CLOCKER_BG_BY_SCENE[sceneBottom];
+  const urlTop = CLOCKER_BG_BY_SCENE[sceneTop];
 
   return (
     <div className="participant-splash-bg" aria-hidden>
@@ -373,7 +409,7 @@ function computeAutoParticipantTeam(clientId, participants) {
   return idx === 0 ? 1 : 2;
 }
 
-/** True for phone / tablet widths; wide screens default to host, narrow to participant when URL does not specify. */
+/** True for phone / tablet widths; wide screens default to Clocker, narrow to participant when URL does not specify. */
 function isMobileViewport() {
   if (typeof window === 'undefined') return false;
   return window.matchMedia('(max-width: 1024px)').matches;
@@ -382,17 +418,19 @@ function isMobileViewport() {
 let cachedInitialAppState = null;
 function getInitialAppStateOnce() {
   if (cachedInitialAppState === null) {
-    const { room: urlRoom, mode: urlMode } = getUrlState();
-    const modePinned = urlMode === 'host' || urlMode === 'participant';
+    const { room: urlRoom, mode: urlModeRaw } = getUrlState();
+    const urlMode = urlModeRaw === 'host' ? CLOCKER_URL_MODE : urlModeRaw;
+    const modePinned =
+      urlModeRaw === 'host' || urlMode === CLOCKER_URL_MODE || urlModeRaw === 'participant';
     const mobile = isMobileViewport();
 
     if (modePinned) {
       let mode = urlMode;
-      // Normalize share links to the intended device: host dashboard on wide screens, draw UI on phones.
-      if (urlMode === 'host' && mobile) {
+      // Normalize share links: Clocker dashboard on wide screens, draw UI on phones.
+      if ((urlModeRaw === 'host' || urlMode === CLOCKER_URL_MODE) && mobile) {
         mode = 'participant';
-      } else if (urlMode === 'participant' && !mobile) {
-        mode = 'host';
+      } else if (urlModeRaw === 'participant' && !mobile) {
+        mode = CLOCKER_URL_MODE;
       }
       cachedInitialAppState = {
         room: urlRoom,
@@ -415,7 +453,7 @@ function getInitialAppStateOnce() {
       const next = makeId();
       cachedInitialAppState = {
         room: next,
-        mode: 'host',
+        mode: CLOCKER_URL_MODE,
         roomInput: next,
       };
     }
@@ -581,7 +619,7 @@ function createTransport(roomId) {
       type: 'room:state',
       payload: {
         roomBackground: normalizeRoomBackground(raw),
-        /** False until host writes a scene — distinguishes “not chosen yet” from explicit water */
+        /** False until Clocker writes a scene — distinguishes “not chosen yet” from explicit water */
         roomBackgroundExplicit: raw != null,
       },
     });
@@ -1129,13 +1167,13 @@ function useSharedRoom(roomId, client) {
 
 
 // ---------------------------------------------------------------------------
-// Aquarium canvas — animated host display.
+// Aquarium canvas — animated Clocker display.
 // heldIdRef   — ref to the id of a creature being dragged (skip its physics)
 // heldPosRef  — ref to {x,y} normalised position of that creature
 // positionsRef — ref that this component fills each frame with [{id,x,y}]
-// teleportRef — ref set by HostView when a creature is dropped: {id, x, y}
+// teleportRef — ref set by ClockerView when a creature is dropped: {id, x, y}
 //               normalised; AquariumCanvas consumes it and moves the creature
-// scene            — key in HOST_BG_BY_SCENE (full-bleed art + vignette).
+// scene            — key in CLOCKER_BG_BY_SCENE (full-bleed art + vignette).
 // splashBgEffects  — when true, crossfade + slow zoom while splash preview rotates.
 // ---------------------------------------------------------------------------
 function AquariumCanvas({
@@ -1164,7 +1202,7 @@ function AquariumCanvas({
   }, [splashBgEffects]);
 
   useEffect(() => {
-    Object.entries(HOST_BG_BY_SCENE).forEach(([id, src]) => {
+    Object.entries(CLOCKER_BG_BY_SCENE).forEach(([id, src]) => {
       if (bgImgBySceneRef.current[id]?.complete) return;
       const img = new Image();
       img.src = src;
@@ -1423,7 +1461,7 @@ function SideAquarium({ creatures, scene = 'water' }) {
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
-    const src = HOST_BG_BY_SCENE[scene] || HOST_BG_BY_SCENE.water;
+    const src = CLOCKER_BG_BY_SCENE[scene] || CLOCKER_BG_BY_SCENE.water;
 
     const paint = (img) => {
       if (img && drawCoverImage(ctx, img, W, H)) {
@@ -1670,7 +1708,7 @@ function DrawingPad({ onCommit, overlay = null }) {
 // ---------------------------------------------------------------------------
 // Views
 // ---------------------------------------------------------------------------
-function HostView({ room, shared, onResetRoom }) {
+function ClockerView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
   const sharedRef = useRef(shared);
   useEffect(() => {
@@ -1729,30 +1767,15 @@ function HostView({ room, shared, onResetRoom }) {
   }, [shared.game.phase]);
 
   const [playing, setPlaying] = useState(false);
-  const [musicVolume, setMusicVolume] = useState(() => {
-    try {
-      const raw = sessionStorage.getItem('hostMusicVolume');
-      if (raw == null) return 1;
-      const v = parseFloat(raw);
-      return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
-    } catch (_) {
-      return 1;
-    }
-  });
+  const [musicVolume, setMusicVolume] = useState(() => readStoredMusicVolume());
   const [handEnabled, setHandEnabled] = useState(false);
-  const [cameraDeviceId, setCameraDeviceId] = useState(() => {
-    try {
-      return sessionStorage.getItem('hostVideoDeviceId') || '';
-    } catch (_) {
-      return '';
-    }
-  });
+  const [cameraDeviceId, setCameraDeviceId] = useState(() => readStoredVideoDeviceId());
   const [videoInputs, setVideoInputs] = useState([]);
   const audioRef = useRef(null);
   const musicVolumeRef = useRef(musicVolume);
   const cameraSelectRef = useRef(null);
-  const hostRootRef = useRef(null);
-  const [hostFullscreen, setHostFullscreen] = useState(false);
+  const clockerRootRef = useRef(null);
+  const [clockerFullscreen, setClockerFullscreen] = useState(false);
   const [hudIdleHidden, setHudIdleHidden] = useState(false);
   const [splashBgChosen, setSplashBgChosen] = useState(false);
   /** While on splash with no background yet: play each scene’s music file to completion, then the next */
@@ -1769,7 +1792,7 @@ function HostView({ room, shared, onResetRoom }) {
   useEffect(() => {
     const sync = () => {
       const el = getBrowserFullscreenElement();
-      setHostFullscreen(!!hostRootRef.current && el === hostRootRef.current);
+      setClockerFullscreen(!!clockerRootRef.current && el === clockerRootRef.current);
     };
     document.addEventListener('fullscreenchange', sync);
     document.addEventListener('webkitfullscreenchange', sync);
@@ -1816,7 +1839,7 @@ function HostView({ room, shared, onResetRoom }) {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem('hostMusicVolume', String(musicVolume));
+      sessionStorage.setItem(CLOCKER_MUSIC_VOL_KEY, String(musicVolume));
     } catch (_) { /* noop */ }
   }, [musicVolume]);
 
@@ -1829,7 +1852,7 @@ function HostView({ room, shared, onResetRoom }) {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem('hostVideoDeviceId', cameraDeviceId || '');
+      sessionStorage.setItem(CLOCKER_VIDEO_DEVICE_KEY, cameraDeviceId || '');
     } catch (_) { /* noop */ }
   }, [cameraDeviceId]);
 
@@ -1974,21 +1997,21 @@ function HostView({ room, shared, onResetRoom }) {
   useEffect(() => {
     if (gPhase !== 'splash' || splashBgChosen) return undefined;
     const t = window.setInterval(() => {
-      setSplashRotateIdx((i) => (i + 1) % HOST_SCENE_OPTIONS.length);
+      setSplashRotateIdx((i) => (i + 1) % CLOCKER_SCENE_OPTIONS.length);
     }, 4500);
     return () => window.clearInterval(t);
   }, [gPhase, splashBgChosen]);
 
   const displayScene =
     gPhase === 'splash' && !splashBgChosen
-      ? HOST_SCENE_OPTIONS[splashRotateIdx].id
+      ? CLOCKER_SCENE_OPTIONS[splashRotateIdx].id
       : normalizeRoomBackground(shared.roomBackground);
 
   const splashMusicPlaylistMode = gPhase === 'splash' && !splashBgChosen;
   const musicSceneForAudio = splashMusicPlaylistMode
-    ? HOST_SCENE_OPTIONS[splashPreSelectMusicIdx % HOST_SCENE_OPTIONS.length].id
+    ? CLOCKER_SCENE_OPTIONS[splashPreSelectMusicIdx % CLOCKER_SCENE_OPTIONS.length].id
     : displayScene;
-  const musicSrc = HOST_MUSIC_BY_SCENE[musicSceneForAudio] ?? HOST_MUSIC_BY_SCENE.water;
+  const musicSrc = CLOCKER_MUSIC_BY_SCENE[musicSceneForAudio] ?? CLOCKER_MUSIC_BY_SCENE.water;
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -2008,7 +2031,7 @@ function HostView({ room, shared, onResetRoom }) {
     const audio = audioRef.current;
     if (!audio || !splashMusicPlaylistMode) return undefined;
     const onEnded = () => {
-      setSplashPreSelectMusicIdx((i) => (i + 1) % HOST_SCENE_OPTIONS.length);
+      setSplashPreSelectMusicIdx((i) => (i + 1) % CLOCKER_SCENE_OPTIONS.length);
     };
     audio.addEventListener('ended', onEnded);
     return () => audio.removeEventListener('ended', onEnded);
@@ -2028,8 +2051,8 @@ function HostView({ room, shared, onResetRoom }) {
     }
   };
 
-  const toggleHostFullscreen = useCallback(async () => {
-    const root = hostRootRef.current;
+  const toggleClockerFullscreen = useCallback(async () => {
+    const root = clockerRootRef.current;
     if (!root) return;
     try {
       if (getBrowserFullscreenElement() === root) await exitBrowserFullscreen();
@@ -2047,43 +2070,43 @@ function HostView({ room, shared, onResetRoom }) {
 
   return (
     <div
-      className={`host-fullscreen${hudIdleHidden && g.phase !== 'splash' ? ' host-fullscreen--ui-idle' : ''}${
-        g.phase === 'splash' ? ' host-fullscreen--splash' : ''
+      className={`clocker-fullscreen${hudIdleHidden && g.phase !== 'splash' ? ' clocker-fullscreen--ui-idle' : ''}${
+        g.phase === 'splash' ? ' clocker-fullscreen--splash' : ''
       }`}
-      ref={hostRootRef}
+      ref={clockerRootRef}
     >
       <audio ref={audioRef} loop={!splashMusicPlaylistMode} preload="metadata" />
 
       {g.phase === 'splash' ? (
         <div
-          className="host-flow-overlay host-flow-overlay--splash"
+          className="clocker-flow-overlay clocker-flow-overlay--splash"
           aria-label="ClockIt — roles and QR for artists"
         >
-          <div className="host-flow-inner host-flow-inner--splash-card">
+          <div className="clocker-flow-inner clocker-flow-inner--splash-card">
             <ClockItLogo />
-            <div className="host-flow-splash-copy">
-              <p className="host-flow-splash-lead host-flow-splash-lead--head">2 teams · 2 players each</p>
-              <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
-              <p className="host-flow-splash-lead">Artist → scan the QR code below</p>
+            <div className="clocker-flow-splash-copy">
+              <p className="clocker-flow-splash-lead clocker-flow-splash-lead--head">2 teams · 2 players each</p>
+              <p className="clocker-flow-splash-lead">Clocker → point to move, pinch to grab</p>
+              <p className="clocker-flow-splash-lead">Artist → scan the QR code below</p>
             </div>
             <QRCodeSVG value={joinUrl} size={140} bgColor="transparent" fgColor="#ffffff" />
-            <div className="host-flow-scene">
-              <p className="host-flow-scene-heading" id="host-splash-scene-label">
+            <div className="clocker-flow-scene">
+              <p className="clocker-flow-scene-heading" id="clocker-splash-scene-label">
                 Pick your stage
               </p>
               <div
-                className="host-flow-scene-picker"
+                className="clocker-flow-scene-picker"
                 role="group"
-                aria-labelledby="host-splash-scene-label"
+                aria-labelledby="clocker-splash-scene-label"
               >
-                {HOST_SCENE_OPTIONS.map(({ id, label }) => {
+                {CLOCKER_SCENE_OPTIONS.map(({ id, label }) => {
                   const chosen =
                     splashBgChosen && normalizeRoomBackground(shared.roomBackground) === id;
                   return (
                     <button
                       key={id}
                       type="button"
-                      className={`host-flow-scene-thumb${chosen ? ' host-flow-scene-thumb--selected' : ''}`}
+                      className={`clocker-flow-scene-thumb${chosen ? ' clocker-flow-scene-thumb--selected' : ''}`}
                       aria-pressed={chosen}
                       onClick={() => {
                         shared.setRoomBackground(id);
@@ -2092,20 +2115,20 @@ function HostView({ room, shared, onResetRoom }) {
                       }}
                     >
                       <span
-                        className="host-flow-scene-thumb-visual"
-                        style={{ backgroundImage: `url('${HOST_BG_BY_SCENE[id]}')` }}
+                        className="clocker-flow-scene-thumb-visual"
+                        style={{ backgroundImage: `url('${CLOCKER_BG_BY_SCENE[id]}')` }}
                         aria-hidden
                       />
-                      <span className="host-flow-scene-thumb-caption">{label}</span>
+                      <span className="clocker-flow-scene-thumb-caption">{label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
-            <div className="host-flow-actions host-flow-actions--single">
+            <div className="clocker-flow-actions clocker-flow-actions--single">
               <button
                 type="button"
-                className="host-flow-action-btn"
+                className="clocker-flow-action-btn"
                 disabled={!splashBgChosen}
                 title={splashBgChosen ? undefined : 'Pick a stage first'}
                 onClick={() => {
@@ -2121,9 +2144,9 @@ function HostView({ room, shared, onResetRoom }) {
       ) : null}
 
       {(g.phase === 'countdown_team1' || g.phase === 'countdown_team2') ? (
-        <div className="host-flow-overlay host-flow-overlay--countdown" aria-live="assertive">
-          <div className="host-flow-countdown-display">
-            <span key={`${g.phase}-${g.countdownStep ?? 0}`} className="host-flow-countdown-line">
+        <div className="clocker-flow-overlay clocker-flow-overlay--countdown" aria-live="assertive">
+          <div className="clocker-flow-countdown-display">
+            <span key={`${g.phase}-${g.countdownStep ?? 0}`} className="clocker-flow-countdown-line">
               {cd.line1}
             </span>
           </div>
@@ -2131,48 +2154,48 @@ function HostView({ room, shared, onResetRoom }) {
       ) : null}
 
       {g.phase === 'results_team1' ? (
-        <div className="host-flow-overlay host-flow-overlay--results">
+        <div className="clocker-flow-overlay clocker-flow-overlay--results">
           <ClockItLogo />
-          <p className="host-flow-results-hero">Time&apos;s Up!</p>
-          <p className="host-flow-results-score">Team 1 — {g.team1Score} pts</p>
-          <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
+          <p className="clocker-flow-results-hero">Time&apos;s Up!</p>
+          <p className="clocker-flow-results-score">Team 1 — {g.team1Score} pts</p>
+          <button type="button" className="clocker-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
             Continue
           </button>
         </div>
       ) : null}
 
       {g.phase === 'results_team2' ? (
-        <div className="host-flow-overlay host-flow-overlay--results">
+        <div className="clocker-flow-overlay clocker-flow-overlay--results">
           <ClockItLogo />
-          <p className="host-flow-results-hero">Time&apos;s Up!</p>
-          <p className="host-flow-results-score">Team 2 — {g.team2Score} pts</p>
-          <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToFinal()}>
+          <p className="clocker-flow-results-hero">Time&apos;s Up!</p>
+          <p className="clocker-flow-results-score">Team 2 — {g.team2Score} pts</p>
+          <button type="button" className="clocker-flow-continue" onClick={() => shared.gameContinueToFinal()}>
             See the Winner
           </button>
         </div>
       ) : null}
 
       {g.phase === 'final' ? (
-        <div className="host-flow-overlay host-flow-overlay--final">
+        <div className="clocker-flow-overlay clocker-flow-overlay--final">
           <ClockItLogo />
-          <div className="host-flow-final-grid">
-            <div className="host-flow-final-box">
-              <span className="host-flow-final-label">Team 1</span>
-              <span className="host-flow-final-num">{g.team1Score}</span>
+          <div className="clocker-flow-final-grid">
+            <div className="clocker-flow-final-box">
+              <span className="clocker-flow-final-label">Team 1</span>
+              <span className="clocker-flow-final-num">{g.team1Score}</span>
             </div>
-            <div className="host-flow-final-box">
-              <span className="host-flow-final-label">Team 2</span>
-              <span className="host-flow-final-num">{g.team2Score}</span>
+            <div className="clocker-flow-final-box">
+              <span className="clocker-flow-final-label">Team 2</span>
+              <span className="clocker-flow-final-num">{g.team2Score}</span>
             </div>
           </div>
-          <p className="host-flow-final-winner">{getWinnerPhrase(g.team1Score, g.team2Score)}</p>
-          <div className="host-flow-final-actions">
-            <button type="button" className="host-flow-play" onClick={() => shared.gameBackToSplash()}>
+          <p className="clocker-flow-final-winner">{getWinnerPhrase(g.team1Score, g.team2Score)}</p>
+          <div className="clocker-flow-final-actions">
+            <button type="button" className="clocker-flow-play" onClick={() => shared.gameBackToSplash()}>
               Play again
             </button>
             <button
               type="button"
-              className="host-flow-play host-flow-play--secondary"
+              className="clocker-flow-play clocker-flow-play--secondary"
               onClick={onResetRoom}
               title="New room code — share the new QR for a fresh game"
             >
@@ -2183,21 +2206,21 @@ function HostView({ room, shared, onResetRoom }) {
       ) : null}
 
       {showPlayHud ? (
-        <div className="host-play-overlay" aria-live="polite">
-          <div className="host-play-overlay-row">
-            <p className="host-play-active">
+        <div className="clocker-play-overlay" aria-live="polite">
+          <div className="clocker-play-overlay-row">
+            <p className="clocker-play-active">
               {g.phase === 'team1' ? 'Team 1' : 'Team 2'}
             </p>
-            <div className="host-play-scores">
-              <div className="host-play-score-block is-active">
-                <span className="host-play-score-num">
+            <div className="clocker-play-scores">
+              <div className="clocker-play-score-block is-active">
+                <span className="clocker-play-score-num">
                   {g.phase === 'team1' ? g.team1Score : g.team2Score}
                 </span>
               </div>
             </div>
-            {g.roundEndAt ? <p className="host-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
+            {g.roundEndAt ? <p className="clocker-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
           </div>
-          <p key={`host-pinch-hint-${g.phase}`} className="host-play-hint">
+          <p key={`clocker-pinch-hint-${g.phase}`} className="clocker-play-hint">
             Pinch to grab creatures and
             <br />
             move them to the right side.
@@ -2206,12 +2229,12 @@ function HostView({ room, shared, onResetRoom }) {
       ) : null}
 
       {relocatePointsPop > 0 ? (
-        <span key={relocatePointsPop} className="points-pop points-pop--host" aria-hidden>
+        <span key={relocatePointsPop} className="points-pop points-pop--clocker" aria-hidden>
           +{GAME_POINTS_MOVE}
         </span>
       ) : null}
 
-      <div className={`host-layout${g.phase === 'splash' ? ' host-layout--splash' : ''}`}>
+      <div className={`clocker-layout${g.phase === 'splash' ? ' clocker-layout--splash' : ''}`}>
         <div className="aquarium-wrapper">
           <AquariumCanvas
             key={room}
@@ -2230,15 +2253,15 @@ function HostView({ room, shared, onResetRoom }) {
       </div>
 
       {g.phase === 'splash' ? (
-      <div className="host-hud host-hud--start-screen">
+      <div className="clocker-hud clocker-hud--start-screen">
         <button
           type="button"
           className="hud-btn hud-btn--icon"
-          onClick={toggleHostFullscreen}
-          aria-label={hostFullscreen ? 'Exit full screen' : 'Full screen'}
-          title={hostFullscreen ? 'Exit full screen' : 'Full screen'}
+          onClick={toggleClockerFullscreen}
+          aria-label={clockerFullscreen ? 'Exit full screen' : 'Full screen'}
+          title={clockerFullscreen ? 'Exit full screen' : 'Full screen'}
         >
-          {hostFullscreen ? <HudIconFullscreenExit /> : <HudIconFullscreenEnter />}
+          {clockerFullscreen ? <HudIconFullscreenExit /> : <HudIconFullscreenEnter />}
         </button>
         <span className="hud-divider" />
         <div className="hud-music-wrap">
@@ -2333,7 +2356,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
   const [, forceClockTick] = useState(0);
   const [sendPointsPop, setSendPointsPop] = useState(0);
   const scene = normalizeRoomBackground(shared.roomBackground);
-  const bgUrl = HOST_BG_BY_SCENE[scene] ?? HOST_BG_BY_SCENE.water;
+  const bgUrl = CLOCKER_BG_BY_SCENE[scene] ?? CLOCKER_BG_BY_SCENE.water;
   const gm = shared.game;
   const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
   const assignedTeam = useMemo(
@@ -2381,7 +2404,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
                 </>
               ) : shared.participants?.[clientId] ? (
                 <>
-                  This room already has <strong>two players</strong> (one per team). Watch the main screen — you
+                  This room already has <strong>two players</strong> (one per team). Watch the Clocker screen — you
                   won&apos;t draw from this phone.
                 </>
               ) : (
@@ -2509,14 +2532,14 @@ function JoinLandingView() {
     <div
       className="participant-shell participant-shell--splash-mode"
       data-scene="water"
-      style={{ '--participant-shell-bg': `url('${HOST_BG_BY_SCENE.water}')` }}
+      style={{ '--participant-shell-bg': `url('${CLOCKER_BG_BY_SCENE.water}')` }}
     >
       <ParticipantSplashBackdrop active lockedSceneId={null} />
       <div className="participant-flow-overlay participant-flow-overlay--splash">
         <div className="participant-flow-inner participant-flow-inner--splash-card">
           <ClockItLogo variant="phone" />
           <p className="participant-assigned-team" role="status">
-            Scan the QR code on the host screen to join.
+            Scan the QR code on the Clocker screen to join.
           </p>
         </div>
       </div>
@@ -2544,7 +2567,7 @@ export default function App() {
 
   const shared = useSharedRoom(room, {
     clientId,
-    name: clientName || (mode === 'host' ? 'Host' : 'Anonymous'),
+    name: clientName || (mode === CLOCKER_URL_MODE ? 'Clocker' : 'Anonymous'),
     role: mode || 'participant',
     color: clientColor,
   });
@@ -2553,16 +2576,16 @@ export default function App() {
     return <JoinLandingView />;
   }
 
-  if (mode === 'host') {
+  if (mode === CLOCKER_URL_MODE) {
     return (
-      <HostView
+      <ClockerView
         room={room}
         shared={shared}
         onResetRoom={() => {
           const next = makeId();
           setRoom(next);
           setRoomInput(next);
-          setMode('host');
+          setMode(CLOCKER_URL_MODE);
         }}
       />
     );

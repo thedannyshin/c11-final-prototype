@@ -63,31 +63,31 @@ p {
   height: 100%;
 }
 
-.host-fullscreen {
+.clocker-fullscreen {
   position: fixed;
   inset: 0;
   background: #050e18;
   overflow: hidden;
 }
 
-.host-fullscreen:fullscreen {
+.clocker-fullscreen:fullscreen {
   width: 100%;
   height: 100%;
   background: #050e18;
 }
 
-.host-fullscreen:-webkit-full-screen {
+.clocker-fullscreen:-webkit-full-screen {
   width: 100%;
   height: 100%;
   background: #050e18;
 }
 
 /* Hide OS mouse cursor while HUD is idle-hidden (hand fingertip overlay is unaffected). */
-.host-fullscreen--ui-idle {
+.clocker-fullscreen--ui-idle {
   cursor: none;
 }
 
-.host-game-bar {
+.clocker-game-bar {
   position: fixed;
   top: 10px;
   left: 50%;
@@ -109,18 +109,18 @@ p {
   user-select: none;
 }
 
-.host-game-scores {
+.clocker-game-scores {
   display: flex;
   gap: 14px;
 }
 
-.host-game-score {
+.clocker-game-score {
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
 }
 
-.host-game-score-label {
+.clocker-game-score-label {
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -128,14 +128,14 @@ p {
   color: rgba(255, 255, 255, 0.45);
 }
 
-.host-game-score-val {
+.clocker-game-score-val {
   font-size: 1.35rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: rgba(255, 255, 255, 0.96);
 }
 
-.host-game-center {
+.clocker-game-center {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -145,18 +145,18 @@ p {
   color: rgba(255, 255, 255, 0.78);
 }
 
-.host-game-phase {
+.clocker-game-phase {
   font-weight: 600;
 }
 
-.host-game-timer {
+.clocker-game-timer {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
   color: rgba(255, 255, 255, 0.95);
 }
 
-.host-game-winner {
+.clocker-game-winner {
   width: 100%;
   text-align: center;
   font-weight: 800;
@@ -164,14 +164,14 @@ p {
   color: rgba(255, 255, 255, 0.95);
 }
 
-.host-game-actions {
+.clocker-game-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
 }
 
-.host-game-btn {
+.clocker-game-btn {
   margin: 0;
   padding: 8px 14px;
   border-radius: 10px;
@@ -184,22 +184,22 @@ p {
   cursor: pointer;
 }
 
-.host-game-btn:hover:not(:disabled) {
+.clocker-game-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.14);
 }
 
-.host-game-btn:disabled {
+.clocker-game-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
-.host-game-btn--ghost {
+.clocker-game-btn--ghost {
   background: transparent;
   color: rgba(255, 255, 255, 0.55);
 }
 
-/* During team1/team2: top bar + pinch hint for host / mover */
-.host-play-overlay {
+/* During team1/team2: top bar + pinch hint for Clocker / mover */
+.clocker-play-overlay {
   position: fixed;
   top: max(12px, env(safe-area-inset-top));
   left: 0;
@@ -217,7 +217,7 @@ p {
   text-align: left;
 }
 
-.host-play-overlay-row {
+.clocker-play-overlay-row {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
@@ -249,7 +249,7 @@ p {
   }
 }
 
-.host-play-hint {
+.clocker-play-hint {
   align-self: center;
   width: 100%;
   max-width: min(92vw, 52rem);
@@ -292,7 +292,7 @@ p {
   animation: points-pop-rise 0.95s ease-out forwards;
 }
 
-.points-pop--host {
+.points-pop--clocker {
   bottom: clamp(120px, 20vh, 200px);
   font-size: clamp(2rem, 6.5vw, 4.75rem);
   font-weight: 900;
@@ -310,7 +310,7 @@ p {
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
 }
 
-.host-play-active {
+.clocker-play-active {
   margin: 0;
   flex: 0 1 auto;
   min-width: 0;
@@ -323,7 +323,7 @@ p {
   white-space: nowrap;
 }
 
-.host-play-scores {
+.clocker-play-scores {
   display: flex;
   flex: 1 1 auto;
   flex-direction: row;
@@ -334,7 +334,7 @@ p {
   min-width: 0;
 }
 
-.host-play-score-block {
+.clocker-play-score-block {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -347,11 +347,11 @@ p {
   border: none;
 }
 
-.host-play-score-block.is-active {
+.clocker-play-score-block.is-active {
   background: transparent;
 }
 
-.host-play-score-label {
+.clocker-play-score-label {
   font-size: clamp(0.7rem, 1.8vw, 0.95rem);
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -359,7 +359,7 @@ p {
   color: rgba(255, 255, 255, 0.5);
 }
 
-.host-play-score-num {
+.clocker-play-score-num {
   font-size: clamp(1.75rem, 5vw, 3.75rem);
   font-weight: 900;
   font-variant-numeric: tabular-nums;
@@ -368,7 +368,7 @@ p {
   text-shadow: 0 4px 36px rgba(0, 0, 0, 0.55);
 }
 
-.host-play-timer {
+.clocker-play-timer {
   margin: 0;
   flex: 0 0 auto;
   font-size: clamp(2rem, 6.5vw, 4.75rem);
@@ -382,7 +382,7 @@ p {
 }
 
 /* Full-screen game flow (splash, countdown, results, final) */
-.host-flow-overlay {
+.clocker-flow-overlay {
   position: fixed;
   inset: 0;
   z-index: 100;
@@ -395,14 +395,14 @@ p {
   -webkit-backdrop-filter: blur(10px);
 }
 
-.host-flow-overlay--splash {
+.clocker-flow-overlay--splash {
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   pointer-events: none;
 }
 
-.host-flow-inner--splash-card {
+.clocker-flow-inner--splash-card {
   pointer-events: auto;
   width: 100%;
   max-width: min(92vw, 27rem);
@@ -414,7 +414,7 @@ p {
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.host-flow-inner {
+.clocker-flow-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -434,7 +434,7 @@ p {
   filter: drop-shadow(0 4px 28px rgba(0, 0, 0, 0.55));
 }
 
-.host-flow-inner--splash-card .clockit-logo,
+.clocker-flow-inner--splash-card .clockit-logo,
 .participant-flow-inner--splash-card .clockit-logo {
   filter: none;
 }
@@ -444,13 +444,13 @@ p {
   margin-bottom: 0.35rem;
 }
 
-.host-flow-subtitle {
+.clocker-flow-subtitle {
   margin: 0;
   font-size: 0.95rem;
   color: rgba(255, 255, 255, 0.55);
 }
 
-.host-flow-splash-copy {
+.clocker-flow-splash-copy {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -459,11 +459,11 @@ p {
   max-width: min(100%, 36rem);
 }
 
-.host-flow-splash-copy .host-flow-splash-lead {
+.clocker-flow-splash-copy .clocker-flow-splash-lead {
   margin: 0;
 }
 
-.host-flow-splash-lead {
+.clocker-flow-splash-lead {
   margin: 0;
   max-width: min(100%, 36rem);
   font-size: clamp(1rem, 2.8vw, 1.2rem);
@@ -473,13 +473,13 @@ p {
   text-align: center;
 }
 
-.host-flow-splash-lead--head {
+.clocker-flow-splash-lead--head {
   font-weight: 900;
   font-size: clamp(1.06rem, 3vw, 1.32rem);
   letter-spacing: 0.02em;
 }
 
-.host-flow-scene {
+.clocker-flow-scene {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -488,7 +488,7 @@ p {
   margin-top: 12px;
 }
 
-.host-flow-scene-heading {
+.clocker-flow-scene-heading {
   margin: 0;
   font-size: clamp(0.78rem, 2.2vw, 0.88rem);
   font-weight: 800;
@@ -498,7 +498,7 @@ p {
   text-align: center;
 }
 
-.host-flow-scene-picker {
+.clocker-flow-scene-picker {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
@@ -508,7 +508,7 @@ p {
   align-items: flex-start;
 }
 
-.host-flow-scene-thumb {
+.clocker-flow-scene-thumb {
   flex: 1 1 0;
   min-width: 0;
   max-width: 6.25rem;
@@ -530,12 +530,12 @@ p {
   -webkit-tap-highlight-color: transparent;
 }
 
-.host-flow-scene-thumb:focus-visible {
+.clocker-flow-scene-thumb:focus-visible {
   outline: 2px solid rgba(0, 212, 255, 0.65);
   outline-offset: 3px;
 }
 
-.host-flow-scene-thumb-visual {
+.clocker-flow-scene-thumb-visual {
   width: 100%;
   aspect-ratio: 1;
   border-radius: 12px;
@@ -550,29 +550,29 @@ p {
     transform 120ms ease;
 }
 
-.host-flow-scene-thumb:hover .host-flow-scene-thumb-visual {
+.clocker-flow-scene-thumb:hover .clocker-flow-scene-thumb-visual {
   border-color: rgba(255, 255, 255, 0.48);
 }
 
-.host-flow-scene-thumb:active .host-flow-scene-thumb-visual {
+.clocker-flow-scene-thumb:active .clocker-flow-scene-thumb-visual {
   transform: scale(0.97);
 }
 
-.host-flow-scene-thumb--selected .host-flow-scene-thumb-visual {
+.clocker-flow-scene-thumb--selected .clocker-flow-scene-thumb-visual {
   border-color: rgba(0, 212, 255, 0.95);
   box-shadow:
     0 0 0 1px rgba(0, 212, 255, 0.35),
     inset 0 0 0 1px rgba(0, 0, 0, 0.2);
 }
 
-.host-flow-scene-thumb-caption {
+.clocker-flow-scene-thumb-caption {
   display: block;
   max-width: 100%;
   text-align: center;
   text-wrap: balance;
 }
 
-.host-flow-actions {
+.clocker-flow-actions {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
@@ -582,11 +582,11 @@ p {
   margin-top: 4px;
 }
 
-.host-flow-actions--single .host-flow-action-btn {
+.clocker-flow-actions--single .clocker-flow-action-btn {
   flex: 1 1 auto;
 }
 
-.host-flow-action-btn {
+.clocker-flow-action-btn {
   flex: 1 1 0;
   min-width: 0;
   margin: 0;
@@ -604,17 +604,17 @@ p {
   box-sizing: border-box;
 }
 
-.host-flow-action-btn:hover:not(:disabled) {
+.clocker-flow-action-btn:hover:not(:disabled) {
   filter: brightness(1.08);
 }
 
-.host-flow-action-btn:disabled {
+.clocker-flow-action-btn:disabled {
   opacity: 0.38;
   cursor: not-allowed;
   filter: none;
 }
 
-.host-flow-final-actions {
+.clocker-flow-final-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -623,7 +623,7 @@ p {
   margin-top: 8px;
 }
 
-.host-flow-play {
+.clocker-flow-play {
   margin: 0;
   padding: 16px 48px;
   border: 1px solid rgba(255, 255, 255, 0.35);
@@ -637,20 +637,20 @@ p {
   cursor: pointer;
 }
 
-.host-flow-play:hover {
+.clocker-flow-play:hover {
   filter: brightness(1.08);
 }
 
-.host-flow-play--secondary {
+.clocker-flow-play--secondary {
   border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.06);
 }
 
-.host-flow-overlay--countdown {
+.clocker-flow-overlay--countdown {
   background: rgba(2, 5, 10, 0.88);
 }
 
-.host-flow-countdown-display {
+.clocker-flow-countdown-display {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -658,15 +658,15 @@ p {
   min-height: 30vh;
 }
 
-.host-flow-countdown-line {
+.clocker-flow-countdown-line {
   font-size: clamp(3rem, 14vw, 7rem);
   font-weight: 900;
   letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.96);
-  animation: host-countdown-pop 0.35s ease-out;
+  animation: clocker-countdown-pop 0.35s ease-out;
 }
 
-@keyframes host-countdown-pop {
+@keyframes clocker-countdown-pop {
   from {
     transform: scale(0.85);
     opacity: 0.6;
@@ -677,28 +677,28 @@ p {
   }
 }
 
-.host-flow-overlay--results {
+.clocker-flow-overlay--results {
   flex-direction: column;
   align-items: center;
   text-align: center;
   gap: 12px;
 }
 
-.host-flow-results-hero {
+.clocker-flow-results-hero {
   margin: 0;
   font-size: clamp(2rem, 6vw, 3rem);
   font-weight: 900;
   color: rgba(255, 255, 255, 0.96);
 }
 
-.host-flow-results-score {
+.clocker-flow-results-score {
   margin: 0;
   font-size: clamp(1.4rem, 4vw, 2rem);
   font-weight: 800;
   color: rgba(255, 255, 255, 0.9);
 }
 
-.host-flow-continue {
+.clocker-flow-continue {
   margin-top: 24px;
   padding: 14px 36px;
   border-radius: 14px;
@@ -711,20 +711,20 @@ p {
   cursor: pointer;
 }
 
-.host-flow-continue:hover {
+.clocker-flow-continue:hover {
   background: rgba(255, 255, 255, 0.16);
 }
 
-.host-flow-overlay--final {
+.clocker-flow-overlay--final {
   flex-direction: column;
   text-align: center;
 }
 
-.host-flow-overlay--final .clockit-logo {
+.clocker-flow-overlay--final .clockit-logo {
   filter: none;
 }
 
-.host-flow-final-grid {
+.clocker-flow-final-grid {
   display: flex;
   gap: 20px;
   justify-content: center;
@@ -732,7 +732,7 @@ p {
   margin: 20px 0 8px;
 }
 
-.host-flow-final-box {
+.clocker-flow-final-box {
   min-width: 9rem;
   padding: 20px 24px;
   border-radius: 20px;
@@ -743,7 +743,7 @@ p {
   gap: 8px;
 }
 
-.host-flow-final-label {
+.clocker-flow-final-label {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -751,21 +751,21 @@ p {
   color: rgba(255, 255, 255, 0.45);
 }
 
-.host-flow-final-num {
+.clocker-flow-final-num {
   font-size: 2.5rem;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   color: rgba(255, 255, 255, 0.96);
 }
 
-.host-flow-final-winner {
+.clocker-flow-final-winner {
   margin: 12px 0 20px;
   font-size: clamp(1.35rem, 4vw, 2rem);
   font-weight: 900;
   color: rgba(255, 255, 255, 0.96);
 }
 
-/* Match host full-screen scrim (.host-flow-overlay); splash start screen overrides below. */
+/* Match Clocker full-screen scrim (.clocker-flow-overlay); splash start screen overrides below. */
 .participant-flow-overlay {
   position: fixed;
   inset: 0;
@@ -874,7 +874,7 @@ p {
   font-weight: 900;
   color: rgba(255, 255, 255, 0.95);
   transform-origin: center center;
-  animation: host-countdown-pop 0.35s ease-out;
+  animation: clocker-countdown-pop 0.35s ease-out;
 }
 
 .participant-flow-overlay--results {
@@ -942,7 +942,7 @@ p {
   color: rgba(255, 255, 255, 0.95);
 }
 
-.host-hud {
+.clocker-hud {
   position: absolute;
   right: 20px;
   bottom: 20px;
@@ -965,12 +965,12 @@ p {
   transition: opacity 0.28s ease, visibility 0.28s ease;
 }
 
-/* Above .host-flow-overlay (z-index 100) on splash — wins over base .host-hud z-index */
-.host-hud.host-hud--start-screen {
+/* Above .clocker-flow-overlay (z-index 100) on splash — wins over base .clocker-hud z-index */
+.clocker-hud.clocker-hud--start-screen {
   z-index: 110;
 }
 
-.host-hud--idle-hidden {
+.clocker-hud--idle-hidden {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -1128,8 +1128,8 @@ p {
   color: rgba(255, 255, 255, 0.65);
 }
 
-/* ── Host layout ─────────────────────────────────────────────────────────── */
-.host-layout {
+/* ── Clocker layout ─────────────────────────────────────────────────────────── */
+.clocker-layout {
   position: absolute;
   inset: 0;
   display: flex;
@@ -1142,7 +1142,7 @@ p {
   overflow: hidden;
 }
 
-.host-layout--splash .aquarium-wrapper {
+.clocker-layout--splash .aquarium-wrapper {
   flex: 1 1 100%;
 }
 
@@ -1269,7 +1269,7 @@ p {
   background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.76));
 }
 
-/* Same bottom vignette as host AquariumCanvas for grass + starry (not water). */
+/* Same bottom vignette as Clocker AquariumCanvas for grass + starry (not water). */
 .participant-shell.participant-shell--splash-mode[data-scene='grass'],
 .participant-shell.participant-shell--splash-mode[data-scene='stars'] {
   background-image:
@@ -1285,7 +1285,7 @@ p {
     var(--participant-shell-bg);
 }
 
-/* Drawer play HUD — mirrors host row: active team | score | timer */
+/* Drawer play HUD — mirrors Clocker row: active team | score | timer */
 .participant-play-hud {
   position: relative;
   z-index: 110;
