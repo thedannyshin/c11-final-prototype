@@ -1972,13 +1972,15 @@ function HostView({ room, shared, onResetRoom }) {
       {g.phase === 'splash' ? (
         <div
           className="host-flow-overlay host-flow-overlay--splash"
-          aria-label="ClockIt — form teams and scan to join"
+          aria-label="ClockIt — roles and QR for artists"
         >
           <div className="host-flow-inner host-flow-inner--splash-card">
             <ClockItLogo />
-            <p className="host-flow-splash-lead">
-              One phone per team (two players total). Each person scans this QR code.
-            </p>
+            <div className="host-flow-splash-copy">
+              <p className="host-flow-splash-lead host-flow-splash-lead--head">2 teams · 2 players each</p>
+              <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
+              <p className="host-flow-splash-lead">Artist → scan the QR below</p>
+            </div>
             <QRCodeSVG value={joinUrl} size={140} bgColor="transparent" fgColor="#ffffff" />
             <div className="host-flow-scene">
               <select

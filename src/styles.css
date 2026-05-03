@@ -668,6 +668,19 @@ p {
   color: rgba(255, 255, 255, 0.55);
 }
 
+.host-flow-splash-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: min(100%, 36rem);
+}
+
+.host-flow-splash-copy .host-flow-splash-lead {
+  margin: 0;
+}
+
 .host-flow-splash-lead {
   margin: 0;
   max-width: min(100%, 36rem);
@@ -676,6 +689,12 @@ p {
   line-height: 1.35;
   color: rgba(255, 255, 255, 0.9);
   text-align: center;
+}
+
+.host-flow-splash-lead--head {
+  font-weight: 900;
+  font-size: clamp(1.06rem, 3vw, 1.32rem);
+  letter-spacing: 0.02em;
 }
 
 .host-flow-scene {
