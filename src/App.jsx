@@ -607,17 +607,6 @@ function loadMediaPipeHands() {
   return _mpHandsPromise;
 }
 
-/** Resolve host pinch targets under the fingertip (`data-host-gesture` on interactive nodes). */
-function hostGestureHitFromPoint(clientX, clientY) {
-  let el = document.elementFromPoint(clientX, clientY);
-  while (el && el !== document.body) {
-    const g = el.getAttribute?.('data-host-gesture');
-    if (g) return { el, gesture: g };
-    el = el.parentElement;
-  }
-  return null;
-}
-
 // ---------------------------------------------------------------------------
 // useHandTracking — webcam + MediaPipe, calls onStart/onEnd via pinchCbRef.
 // cameraDeviceId — empty string = browser default (facingMode user when applicable).
@@ -649,25 +638,12 @@ function useHandTracking(enabled, cameraDeviceId = '') {
         });
         hands.setOptions({
           maxNumHands: 1,
-          modelComplexity: 1,
-          minDetectionConfidence: 0.65,
-          minTrackingConfidence: 0.6,
+          modelComplexity: 0,
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.5,
         });
         const smoothRef = { x: null, y: null };
-        /** Cursor smoothing: lower α = steadier glow, slightly more lag */
-        const CURSOR_ALPHA = 0.2;
-        /** Ignore single-frame spikes from noisy landmarks */
-        const MAX_CURSOR_JUMP_PX = 40;
-
-        /** Pinch uses smoothed landmarks in normalized image space + hysteresis (not inconsistent px scaling). */
-        const pinchLmRef = { tx: null, ty: null, sx: null, sy: null };
-        const PINCH_LM_ALPHA = 0.42;
-        const PINCH_ENTER_NORM = 0.058;
-        const PINCH_EXIT_NORM = 0.092;
-        let pinchStartFrames = 0;
-        let pinchReleaseFrames = 0;
-        const PINCH_FRAMES_TO_START = 2;
-        const PINCH_FRAMES_TO_RELEASE = 3;
+        const SMOOTH = 0.5; // lerp factor: lower = smoother but laggier
 
         hands.onResults((results) => {
           if (!active) return;
@@ -677,9 +653,6 @@ function useHandTracking(enabled, cameraDeviceId = '') {
             setFingertipPos(null);
             smoothRef.x = null;
             smoothRef.y = null;
-            pinchLmRef.tx = pinchLmRef.ty = pinchLmRef.sx = pinchLmRef.sy = null;
-            pinchStartFrames = 0;
-            pinchReleaseFrames = 0;
             if (prevPinchRef.current) {
               prevPinchRef.current = false;
               pinchCbRef.current.onEnd?.(null);
@@ -689,25 +662,6 @@ function useHandTracking(enabled, cameraDeviceId = '') {
           const lm = results.multiHandLandmarks[0];
           const tip = lm[8];   // index fingertip
           const thumb = lm[4]; // thumb tip
-
-          const pa = PINCH_LM_ALPHA;
-          if (pinchLmRef.tx == null) {
-            pinchLmRef.tx = tip.x;
-            pinchLmRef.ty = tip.y;
-            pinchLmRef.sx = thumb.x;
-            pinchLmRef.sy = thumb.y;
-          } else {
-            pinchLmRef.tx += (tip.x - pinchLmRef.tx) * pa;
-            pinchLmRef.ty += (tip.y - pinchLmRef.ty) * pa;
-            pinchLmRef.sx += (thumb.x - pinchLmRef.sx) * pa;
-            pinchLmRef.sy += (thumb.y - pinchLmRef.sy) * pa;
-          }
-
-          const pinchDistNorm = Math.hypot(pinchLmRef.tx - pinchLmRef.sx, pinchLmRef.ty - pinchLmRef.sy);
-          const pinchGestureOn = prevPinchRef.current
-            ? pinchDistNorm < PINCH_EXIT_NORM
-            : pinchDistNorm < PINCH_ENTER_NORM;
-
           // Mirror x so it matches the user's perspective.
           // Remap a centred 55% band of the camera frame to the full screen so
           // the user doesn't have to move their hand to the very edge of frame.
@@ -717,43 +671,20 @@ function useHandTracking(enabled, cameraDeviceId = '') {
           const normY = Math.max(0, Math.min(1, (tip.y - CAM_PAD_Y) / (1 - 2 * CAM_PAD_Y)));
           const rawX = normX * window.innerWidth;
           const rawY = normY * window.innerHeight;
-
-          if (smoothRef.x === null) {
-            smoothRef.x = rawX;
-            smoothRef.y = rawY;
-          } else {
-            let nx = smoothRef.x + (rawX - smoothRef.x) * CURSOR_ALPHA;
-            let ny = smoothRef.y + (rawY - smoothRef.y) * CURSOR_ALPHA;
-            const jdx = nx - smoothRef.x;
-            const jdy = ny - smoothRef.y;
-            const jlen = Math.hypot(jdx, jdy);
-            if (jlen > MAX_CURSOR_JUMP_PX && jlen > 0) {
-              const s = MAX_CURSOR_JUMP_PX / jlen;
-              nx = smoothRef.x + jdx * s;
-              ny = smoothRef.y + jdy * s;
-            }
-            smoothRef.x = nx;
-            smoothRef.y = ny;
-          }
+          // Exponential smoothing to reduce jitter
+          if (smoothRef.x === null) { smoothRef.x = rawX; smoothRef.y = rawY; }
+          else { smoothRef.x += (rawX - smoothRef.x) * SMOOTH; smoothRef.y += (rawY - smoothRef.y) * SMOOTH; }
           const sx = smoothRef.x;
           const sy = smoothRef.y;
           setFingertipPos({ x: sx, y: sy });
 
-          if (pinchGestureOn) {
-            pinchStartFrames += 1;
-            pinchReleaseFrames = 0;
-          } else {
-            pinchReleaseFrames += 1;
-            pinchStartFrames = 0;
-          }
+          const dx = (tip.x - thumb.x) * window.innerWidth;
+          const dy = (tip.y - thumb.y) * window.innerHeight;
+          const pinching = Math.sqrt(dx * dx + dy * dy) < 55;
 
-          if (!prevPinchRef.current && pinchStartFrames >= PINCH_FRAMES_TO_START) {
-            prevPinchRef.current = true;
-            pinchCbRef.current.onStart?.({ x: sx, y: sy });
-          } else if (prevPinchRef.current && pinchReleaseFrames >= PINCH_FRAMES_TO_RELEASE) {
-            prevPinchRef.current = false;
-            pinchCbRef.current.onEnd?.({ x: sx, y: sy });
-          }
+          if (pinching && !prevPinchRef.current) pinchCbRef.current.onStart?.({ x: sx, y: sy });
+          if (!pinching && prevPinchRef.current) pinchCbRef.current.onEnd?.({ x: sx, y: sy });
+          prevPinchRef.current = pinching;
         });
 
         const videoConstraints = cameraDeviceId
@@ -1657,13 +1588,9 @@ function DrawingPad({ onCommit, overlay = null }) {
 function HostView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
   const sharedRef = useRef(shared);
-  const onResetRoomRef = useRef(onResetRoom);
   useEffect(() => {
     sharedRef.current = shared;
   }, [shared]);
-  useEffect(() => {
-    onResetRoomRef.current = onResetRoom;
-  }, [onResetRoom]);
 
   const [, forceClockTick] = useState(0);
   useEffect(() => {
@@ -1727,7 +1654,7 @@ function HostView({ room, shared, onResetRoom }) {
       return 1;
     }
   });
-  const [handEnabled, setHandEnabled] = useState(true);
+  const [handEnabled, setHandEnabled] = useState(false);
   const [cameraDeviceId, setCameraDeviceId] = useState(() => {
     try {
       return sessionStorage.getItem('hostVideoDeviceId') || '';
@@ -1888,6 +1815,66 @@ function HostView({ room, shared, onResetRoom }) {
     };
   }, [fingertipPos]);
 
+  // Wire pinch callbacks once — they read from refs so no stale-closure issue.
+  useEffect(() => {
+    pinchCbRef.current.onStart = (pos) => {
+      if (heldIdRef.current || !pos) return;
+      const canvasW = mainAquariumWidthPx();
+      const canvasH = window.innerHeight;
+      const normX = pos.x / canvasW;
+      const normY = pos.y / canvasH;
+      const threshold = Math.min(canvasW, canvasH) * 0.15;
+
+      let nearest = null;
+      let nearestDist = Infinity;
+      for (const c of creaturePositionsRef.current) {
+        if (hiddenIdsRef.current.has(c.id)) continue;
+        const dx = (c.x - normX) * canvasW;
+        const dy = (c.y - normY) * canvasH;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < nearestDist) { nearest = c; nearestDist = dist; }
+      }
+      if (nearest && nearestDist < threshold) {
+        const creature = sharedStrokesRef.current.find((s) => s.id === nearest.id);
+        heldIdRef.current = nearest.id;
+        heldPosRef.current = { x: normX, y: normY };
+        setHeldCreature(creature || null);
+      }
+    };
+
+    pinchCbRef.current.onEnd = (pos) => {
+      const id = heldIdRef.current;
+      if (!id) return;
+      const canvasW = mainAquariumWidthPx();
+
+      if (pos && pos.x > canvasW) {
+        // Dropped in side panel — store drop position relative to panel left edge.
+        const creature = sharedStrokesRef.current.find((s) => s.id === id);
+        if (creature) {
+          setSideCreatures((prev) => [
+            ...prev.filter((c) => c.id !== id),
+            { ...creature, dropX: pos.x - canvasW, dropY: pos.y },
+          ]);
+          hiddenIdsRef.current = new Set([...hiddenIdsRef.current, id]);
+          setHiddenIds(new Set(hiddenIdsRef.current));
+          sharedRef.current.awardRelocatePoints();
+          bumpRelocatePointsPopRef.current();
+        }
+      } else if (pos) {
+        // Dropped in main aquarium — teleport creature to drop position.
+        teleportRef.current = {
+          id,
+          x: Math.max(0.04, Math.min(0.96, pos.x / canvasW)),
+          y: Math.max(0.10, Math.min(0.88, pos.y / window.innerHeight)),
+        };
+      }
+
+      heldIdRef.current = null;
+      heldPosRef.current = null;
+      setHeldCreature(null);
+    };
+  }, []);
+
   const gPhase = shared.game.phase;
 
   useEffect(() => {
@@ -1967,131 +1954,6 @@ function HostView({ room, shared, onResetRoom }) {
     }
   }, []);
 
-  const hostPinchUiRef = useRef({});
-  hostPinchUiRef.current = {
-    splashBgChosen,
-    setSplashBgChosen,
-    setPlaying,
-    setHandEnabled,
-    toggleMusic,
-    toggleHostFullscreen,
-  };
-
-  useEffect(() => {
-    pinchCbRef.current.onStart = (pos) => {
-      if (!pos) return;
-      const phase = sharedRef.current.game.phase;
-      const hit = hostGestureHitFromPoint(pos.x, pos.y);
-
-      if (phase === 'splash' && hit) {
-        if (hit.gesture === 'splash-stage') {
-          const sid = hit.el.getAttribute('data-stage-id');
-          if (sid && normalizeRoomBackground(sid) === sid) {
-            sharedRef.current.setRoomBackground(sid);
-            hostPinchUiRef.current.setSplashBgChosen(true);
-            hostPinchUiRef.current.setPlaying(true);
-          }
-          return;
-        }
-        if (hit.gesture === 'splash-play') {
-          if (!hostPinchUiRef.current.splashBgChosen) return;
-          hostPinchUiRef.current.setHandEnabled(true);
-          sharedRef.current.gamePlayFromSplash();
-          return;
-        }
-        if (hit.gesture === 'hud-fullscreen') {
-          void hostPinchUiRef.current.toggleHostFullscreen();
-          return;
-        }
-        if (hit.gesture === 'hud-music') {
-          hostPinchUiRef.current.toggleMusic();
-          return;
-        }
-        if (hit.gesture === 'hud-webcam') {
-          hostPinchUiRef.current.setHandEnabled((v) => !v);
-          return;
-        }
-      }
-
-      if (phase === 'final' && hit) {
-        if (hit.gesture === 'final-play-again') {
-          sharedRef.current.gameBackToSplash();
-          return;
-        }
-        if (hit.gesture === 'final-new-game') {
-          onResetRoomRef.current?.();
-          return;
-        }
-      }
-
-      if (phase === 'results_team1' && hit?.gesture === 'results-continue') {
-        sharedRef.current.gameContinueToTeam2();
-        return;
-      }
-      if (phase === 'results_team2' && hit?.gesture === 'results-continue') {
-        sharedRef.current.gameContinueToFinal();
-        return;
-      }
-
-      if (heldIdRef.current) return;
-
-      const canvasW = mainAquariumWidthPx();
-      const canvasH = window.innerHeight;
-      const normX = pos.x / canvasW;
-      const normY = pos.y / canvasH;
-      const threshold = Math.min(canvasW, canvasH) * 0.15;
-
-      let nearest = null;
-      let nearestDist = Infinity;
-      for (const c of creaturePositionsRef.current) {
-        if (hiddenIdsRef.current.has(c.id)) continue;
-        const dx = (c.x - normX) * canvasW;
-        const dy = (c.y - normY) * canvasH;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < nearestDist) {
-          nearest = c;
-          nearestDist = dist;
-        }
-      }
-      if (nearest && nearestDist < threshold) {
-        const creature = sharedStrokesRef.current.find((s) => s.id === nearest.id);
-        heldIdRef.current = nearest.id;
-        heldPosRef.current = { x: normX, y: normY };
-        setHeldCreature(creature || null);
-      }
-    };
-
-    pinchCbRef.current.onEnd = (pos) => {
-      const id = heldIdRef.current;
-      if (!id) return;
-      const canvasW = mainAquariumWidthPx();
-
-      if (pos && pos.x > canvasW) {
-        const creature = sharedStrokesRef.current.find((s) => s.id === id);
-        if (creature) {
-          setSideCreatures((prev) => [
-            ...prev.filter((c) => c.id !== id),
-            { ...creature, dropX: pos.x - canvasW, dropY: pos.y },
-          ]);
-          hiddenIdsRef.current = new Set([...hiddenIdsRef.current, id]);
-          setHiddenIds(new Set(hiddenIdsRef.current));
-          sharedRef.current.awardRelocatePoints();
-          bumpRelocatePointsPopRef.current();
-        }
-      } else if (pos) {
-        teleportRef.current = {
-          id,
-          x: Math.max(0.04, Math.min(0.96, pos.x / canvasW)),
-          y: Math.max(0.10, Math.min(0.88, pos.y / window.innerHeight)),
-        };
-      }
-
-      heldIdRef.current = null;
-      heldPosRef.current = null;
-      setHeldCreature(null);
-    };
-  }, []);
-
   const visibleStrokes = shared.strokes.filter((s) => !hiddenIds.has(s.id));
 
   const g = shared.game;
@@ -2119,7 +1981,7 @@ function HostView({ room, shared, onResetRoom }) {
               <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
               <p className="host-flow-splash-lead">Artist → scan the QR below</p>
             </div>
-            <QRCodeSVG value={joinUrl} size={96} bgColor="transparent" fgColor="#ffffff" />
+            <QRCodeSVG value={joinUrl} size={140} bgColor="transparent" fgColor="#ffffff" />
             <div className="host-flow-scene">
               <p className="host-flow-scene-heading" id="host-splash-scene-label">
                 Pick your stage
@@ -2138,8 +2000,6 @@ function HostView({ room, shared, onResetRoom }) {
                       type="button"
                       className={`host-flow-scene-thumb${chosen ? ' host-flow-scene-thumb--selected' : ''}`}
                       aria-pressed={chosen}
-                      data-host-gesture="splash-stage"
-                      data-stage-id={id}
                       onClick={() => {
                         shared.setRoomBackground(id);
                         setSplashBgChosen(true);
@@ -2163,7 +2023,6 @@ function HostView({ room, shared, onResetRoom }) {
                 className="host-flow-action-btn"
                 disabled={!splashBgChosen}
                 title={splashBgChosen ? undefined : 'Pick a stage first'}
-                data-host-gesture="splash-play"
                 onClick={() => {
                   setHandEnabled(true);
                   shared.gamePlayFromSplash();
@@ -2171,94 +2030,6 @@ function HostView({ room, shared, onResetRoom }) {
               >
                 Play
               </button>
-            </div>
-          </div>
-          <div className="host-hud host-hud--start-screen">
-            <button
-              type="button"
-              className="hud-btn hud-btn--icon"
-              data-host-gesture="hud-fullscreen"
-              onClick={toggleHostFullscreen}
-              aria-label={hostFullscreen ? 'Exit full screen' : 'Full screen'}
-              title={hostFullscreen ? 'Exit full screen' : 'Full screen'}
-            >
-              {hostFullscreen ? <HudIconFullscreenExit /> : <HudIconFullscreenEnter />}
-            </button>
-            <span className="hud-divider" />
-            <div className="hud-music-wrap">
-              <button
-                type="button"
-                className={`hud-btn hud-btn--icon${playing ? ' hud-btn-active' : ''}`}
-                data-host-gesture="hud-music"
-                onClick={toggleMusic}
-                aria-label={playing ? 'Pause music' : 'Play music'}
-                title={playing ? 'Pause music' : 'Play music'}
-              >
-                {playing ? <HudIconMusic /> : <HudIconMusicOff />}
-              </button>
-              <div
-                className="hud-volume-rail"
-                aria-label="Music volume"
-                title={playing ? undefined : `Paused — will play at ${Math.round(musicVolume * 100)}%`}
-              >
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={playing ? musicVolume : 0}
-                  disabled={!playing}
-                  onChange={(e) => {
-                    const v = parseFloat(e.target.value);
-                    setMusicVolume(Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1);
-                  }}
-                />
-                <span className="hud-volume-rail-value">
-                  {playing ? `${Math.round(musicVolume * 100)}%` : '0%'}
-                </span>
-              </div>
-            </div>
-            <span className="hud-divider" />
-            <div className="hud-camera-control">
-              <button
-                type="button"
-                className={`hud-btn hud-btn--icon${handEnabled ? ' hud-btn-active' : ''}`}
-                data-host-gesture="hud-webcam"
-                onClick={() => setHandEnabled((v) => !v)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  const sel = cameraSelectRef.current;
-                  if (!sel) return;
-                  Promise.resolve(refreshVideoDevices()).then(() => {
-                    if (typeof sel.showPicker === 'function') {
-                      sel.showPicker().catch(() => { try { sel.click(); } catch (_) { /* noop */ } });
-                    } else {
-                      try { sel.click(); } catch (_) { /* noop */ }
-                    }
-                  });
-                }}
-                title="Tap: hand tracking on/off · Right-click: choose webcam"
-                aria-label="Hand tracking and webcam. Toggle on click. Right-click to choose camera."
-                aria-pressed={handEnabled}
-              >
-                <HudIconWebcam />
-              </button>
-              <select
-                ref={cameraSelectRef}
-                className="hud-select hud-select--camera-hidden"
-                value={cameraDeviceId}
-                onChange={(e) => setCameraDeviceId(e.target.value)}
-                aria-hidden
-                tabIndex={-1}
-                title="Choose webcam"
-              >
-                <option value="">Default camera</option>
-                {videoInputs.map((d, i) => (
-                  <option key={d.deviceId} value={d.deviceId}>
-                    {d.label?.trim() ? d.label : `Camera ${i + 1}`}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
         </div>
@@ -2279,12 +2050,7 @@ function HostView({ room, shared, onResetRoom }) {
           <ClockItLogo />
           <p className="host-flow-results-hero">Time&apos;s Up!</p>
           <p className="host-flow-results-score">Team 1 — {g.team1Score} pts</p>
-          <button
-            type="button"
-            className="host-flow-continue"
-            data-host-gesture="results-continue"
-            onClick={() => shared.gameContinueToTeam2()}
-          >
+          <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
             Continue
           </button>
         </div>
@@ -2295,12 +2061,7 @@ function HostView({ room, shared, onResetRoom }) {
           <ClockItLogo />
           <p className="host-flow-results-hero">Time&apos;s Up!</p>
           <p className="host-flow-results-score">Team 2 — {g.team2Score} pts</p>
-          <button
-            type="button"
-            className="host-flow-continue"
-            data-host-gesture="results-continue"
-            onClick={() => shared.gameContinueToFinal()}
-          >
+          <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToFinal()}>
             See the Winner
           </button>
         </div>
@@ -2321,18 +2082,12 @@ function HostView({ room, shared, onResetRoom }) {
           </div>
           <p className="host-flow-final-winner">{getWinnerPhrase(g.team1Score, g.team2Score)}</p>
           <div className="host-flow-final-actions">
-            <button
-              type="button"
-              className="host-flow-play"
-              data-host-gesture="final-play-again"
-              onClick={() => shared.gameBackToSplash()}
-            >
+            <button type="button" className="host-flow-play" onClick={() => shared.gameBackToSplash()}>
               Play again
             </button>
             <button
               type="button"
               className="host-flow-play host-flow-play--secondary"
-              data-host-gesture="final-new-game"
               onClick={onResetRoom}
               title="New room code — share the new QR for a fresh game"
             >
@@ -2388,6 +2143,94 @@ function HostView({ room, shared, onResetRoom }) {
           <SideAquarium creatures={sideCreatures} scene={displayScene} />
         ) : null}
       </div>
+
+      {g.phase === 'splash' ? (
+      <div className="host-hud host-hud--start-screen">
+        <button
+          type="button"
+          className="hud-btn hud-btn--icon"
+          onClick={toggleHostFullscreen}
+          aria-label={hostFullscreen ? 'Exit full screen' : 'Full screen'}
+          title={hostFullscreen ? 'Exit full screen' : 'Full screen'}
+        >
+          {hostFullscreen ? <HudIconFullscreenExit /> : <HudIconFullscreenEnter />}
+        </button>
+        <span className="hud-divider" />
+        <div className="hud-music-wrap">
+          <button
+            type="button"
+            className={`hud-btn hud-btn--icon${playing ? ' hud-btn-active' : ''}`}
+            onClick={toggleMusic}
+            aria-label={playing ? 'Pause music' : 'Play music'}
+            title={playing ? 'Pause music' : 'Play music'}
+          >
+            {playing ? <HudIconMusic /> : <HudIconMusicOff />}
+          </button>
+          <div
+            className="hud-volume-rail"
+            aria-label="Music volume"
+            title={playing ? undefined : `Paused — will play at ${Math.round(musicVolume * 100)}%`}
+          >
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={playing ? musicVolume : 0}
+              disabled={!playing}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                setMusicVolume(Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1);
+              }}
+            />
+            <span className="hud-volume-rail-value">
+              {playing ? `${Math.round(musicVolume * 100)}%` : '0%'}
+            </span>
+          </div>
+        </div>
+        <span className="hud-divider" />
+        <div className="hud-camera-control">
+          <button
+            type="button"
+            className={`hud-btn hud-btn--icon${handEnabled ? ' hud-btn-active' : ''}`}
+            onClick={() => setHandEnabled((v) => !v)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              const sel = cameraSelectRef.current;
+              if (!sel) return;
+              Promise.resolve(refreshVideoDevices()).then(() => {
+                if (typeof sel.showPicker === 'function') {
+                  sel.showPicker().catch(() => { try { sel.click(); } catch (_) { /* noop */ } });
+                } else {
+                  try { sel.click(); } catch (_) { /* noop */ }
+                }
+              });
+            }}
+            title="Tap: hand tracking on/off · Right-click: choose webcam"
+            aria-label="Hand tracking and webcam. Toggle on click. Right-click to choose camera."
+            aria-pressed={handEnabled}
+          >
+            <HudIconWebcam />
+          </button>
+          <select
+            ref={cameraSelectRef}
+            className="hud-select hud-select--camera-hidden"
+            value={cameraDeviceId}
+            onChange={(e) => setCameraDeviceId(e.target.value)}
+            aria-hidden
+            tabIndex={-1}
+            title="Choose webcam"
+          >
+            <option value="">Default camera</option>
+            {videoInputs.map((d, i) => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label?.trim() ? d.label : `Camera ${i + 1}`}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      ) : null}
 
       <HeldCreatureOverlay creature={heldCreature} pos={fingertipPos} />
 
