@@ -1588,9 +1588,76 @@ function HostView({ room, shared, onResetRoom }) {
   );
 }
 
+const PARTICIPANT_HOW_TO_STEPS = [
+  'Organize into 2 teams of 2. One team member (the clocker) will sit in front of the webcam. The other team member (the artist) will scan the QR.',
+  'The QR code will take the artist to a drawing page. Choose the background, and start drawing things as fast as you can!',
+  'These drawings will be dropped into the displayed environment. The clocker will have to drag those drawings into the designated area in the panel on the right by using a pinching gesture. You will get more points if you are both fast and accurate!',
+  'After the timer is up, the second team will repeat the same process. The team with the highest score wins!',
+];
+
+function ParticipantHowToModal({ open, onClose }) {
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (open && panelRef.current) {
+      const t = window.setTimeout(() => panelRef.current?.focus(), 0);
+      return () => window.clearTimeout(t);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="participant-howto-backdrop"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={panelRef}
+        className="participant-howto-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="participant-howto-title"
+        tabIndex={-1}
+      >
+        <div className="participant-howto-panel-header">
+          <h2 id="participant-howto-title" className="participant-howto-brand">
+            <span className="participant-howto-welcome">Welcome to</span>
+            <span className="participant-howto-clockit">Clockit</span>
+          </h2>
+          <button type="button" className="participant-howto-close" onClick={onClose} aria-label="Close instructions">
+            ×
+          </button>
+        </div>
+        <h3 className="participant-howto-subtitle">How to play</h3>
+        <ol className="participant-howto-list">
+          {PARTICIPANT_HOW_TO_STEPS.map((text, i) => (
+            <li key={i}>{text}</li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 function ParticipantView({ room, shared, clientName, setClientName, clientColor }) {
+  const [howToOpen, setHowToOpen] = useState(false);
+
   return (
     <div className="participant-shell">
+      <ParticipantHowToModal open={howToOpen} onClose={() => setHowToOpen(false)} />
       <div className="participant-header">
         <span className="pill">Room {room}</span>
         <div className="participant-scene-wrap">
@@ -1608,6 +1675,15 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
             ))}
           </select>
         </div>
+        <button
+          type="button"
+          className="participant-howto-trigger"
+          onClick={() => setHowToOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={howToOpen}
+        >
+          How to play
+        </button>
       </div>
       <DrawingPad onCommit={shared.addCharacter} />
     </div>

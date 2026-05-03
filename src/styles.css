@@ -658,6 +658,139 @@ p {
   flex-shrink: 0;
 }
 
+.participant-howto-trigger {
+  flex-shrink: 0;
+  align-self: center;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.participant-howto-trigger:focus {
+  outline: none;
+  border-color: rgba(0, 212, 255, 0.45);
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+}
+
+.participant-howto-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  background: rgba(5, 14, 24, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.participant-howto-panel {
+  width: min(100%, 26rem);
+  max-height: min(88dvh, 640px);
+  overflow: auto;
+  padding: 20px 22px 22px;
+  border-radius: 20px;
+  background: #f4f1e8;
+  color: #143d2e;
+  border: 2px solid #1a4d3a;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+  outline: none;
+}
+
+.participant-howto-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.participant-howto-brand {
+  margin: 0;
+  line-height: 1.15;
+}
+
+.participant-howto-welcome {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #1a4d3a;
+  opacity: 0.85;
+}
+
+.participant-howto-clockit {
+  display: block;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0f3326;
+}
+
+.participant-howto-close {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  margin: -4px -6px 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #1a4d3a;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.participant-howto-close:hover {
+  background: rgba(26, 77, 58, 0.08);
+}
+
+.participant-howto-close:focus {
+  outline: 2px solid #1a4d3a;
+  outline-offset: 2px;
+}
+
+.participant-howto-subtitle {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #143d2e;
+}
+
+.participant-howto-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: #143d2e;
+}
+
+.participant-howto-list li {
+  padding-left: 0.25rem;
+}
+
 .participant-scene-wrap {
   position: relative;
   flex: 1;
