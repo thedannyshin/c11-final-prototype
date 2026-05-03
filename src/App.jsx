@@ -375,23 +375,14 @@ function getJoinUrl(room) {
   return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(room)}&mode=participant`;
 }
 
-const PARTICIPANT_TEAM_STORAGE_PREFIX = 'clockit-participant-team-';
-
-function readStoredParticipantTeam(roomId) {
-  if (!roomId) return null;
-  try {
-    const v = sessionStorage.getItem(PARTICIPANT_TEAM_STORAGE_PREFIX + roomId);
-    if (v === '1' || v === '2') return Number(v);
-  } catch (_) { /* noop */ }
-  return null;
-}
-
-function writeStoredParticipantTeam(roomId, team) {
-  if (!roomId) return;
-  try {
-    if (team == null) sessionStorage.removeItem(PARTICIPANT_TEAM_STORAGE_PREFIX + roomId);
-    else sessionStorage.setItem(PARTICIPANT_TEAM_STORAGE_PREFIX + roomId, String(team));
-  } catch (_) { /* noop */ }
+/** Stable join order: sorted participant clientIds → slots 0–1 Team 1, 2–3 Team 2 (repeats for 5+). */
+function computeAutoParticipantTeam(clientId, participants) {
+  const ids = Object.keys(participants || {})
+    .filter((id) => (participants[id]?.role || '') === 'participant')
+    .sort();
+  const idx = ids.indexOf(clientId);
+  if (idx < 0) return 1;
+  return idx % 4 < 2 ? 1 : 2;
 }
 
 /** True for phone / tablet widths; wide screens default to host, narrow to participant when URL does not specify. */
@@ -835,23 +826,19 @@ function useSharedRoom(roomId, client) {
     name: client.name,
     role: client.role,
     color: client.color,
-    team: client.team,
   });
   presencePayloadRef.current = {
     name: client.name,
     role: client.role,
     color: client.color,
-    team: client.team,
   };
 
   function sendPresencePayload(transport) {
     const p = presencePayloadRef.current;
-    const payload = { name: p.name, role: p.role, color: p.color };
-    if (p.team === 1 || p.team === 2) payload.team = p.team;
     transport.send({
       type: 'presence:update',
       clientId: client.clientId,
-      payload,
+      payload: { name: p.name, role: p.role, color: p.color },
     });
   }
 
@@ -921,12 +908,6 @@ function useSharedRoom(roomId, client) {
       transport.destroy();
     };
   }, [roomId, client.clientId]);
-
-  useEffect(() => {
-    if (!transportRef.current || !roomId) return undefined;
-    sendPresencePayload(transportRef.current);
-    return undefined;
-  }, [roomId, client.clientId, client.team]);
 
   // Prune stale participants.
   useEffect(() => {
@@ -2313,17 +2294,20 @@ function HostView({ room, shared, onResetRoom }) {
   );
 }
 
-function ParticipantView({ shared, clientName, setClientName, clientColor, participantTeam, setParticipantTeam }) {
+function ParticipantView({ shared, clientName, setClientName, clientColor, clientId }) {
   const [, forceClockTick] = useState(0);
   const [drawHintVisible, setDrawHintVisible] = useState(false);
   const scene = normalizeRoomBackground(shared.roomBackground);
   const bgUrl = HOST_BG_BY_SCENE[scene] ?? HOST_BG_BY_SCENE.water;
   const gm = shared.game;
   const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
+  const assignedTeam = useMemo(
+    () => computeAutoParticipantTeam(clientId, shared.participants),
+    [clientId, shared.participants],
+  );
   const myTurnToDraw =
     inDrawRound &&
-    participantTeam != null &&
-    ((gm.phase === 'team1' && participantTeam === 1) || (gm.phase === 'team2' && participantTeam === 2));
+    ((gm.phase === 'team1' && assignedTeam === 1) || (gm.phase === 'team2' && assignedTeam === 2));
   const cdPhone = getCountdownDisplay(gm);
 
   useEffect(() => {
@@ -2347,38 +2331,9 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, parti
     <div
       className={`participant-shell${gm.phase === 'splash' ? ' participant-shell--splash-mode' : ''}`}
       data-scene={scene}
-      data-my-team={participantTeam === 1 || participantTeam === 2 ? String(participantTeam) : undefined}
+      data-my-team={String(assignedTeam)}
       style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
     >
-      <div
-        className={`participant-team-strip${
-          participantTeam === 1
-            ? ' participant-team-strip--1'
-            : participantTeam === 2
-              ? ' participant-team-strip--2'
-              : ' participant-team-strip--unset'
-        }`}
-        role="status"
-        aria-live="polite"
-      >
-        {participantTeam === 1 || participantTeam === 2 ? (
-          <>
-            <span className="participant-team-strip-label">You&apos;re on</span>
-            <span className="participant-team-strip-name">Team {participantTeam}</span>
-          </>
-        ) : (
-          <>
-            <span className="participant-team-strip-hint">Your team</span>
-            <button type="button" className="participant-team-chip" onClick={() => setParticipantTeam(1)}>
-              Team 1
-            </button>
-            <button type="button" className="participant-team-chip" onClick={() => setParticipantTeam(2)}>
-              Team 2
-            </button>
-          </>
-        )}
-      </div>
-
       {gm.phase === 'splash' ? (
         <ParticipantSplashBackdrop
           active
@@ -2394,28 +2349,9 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, parti
               Get ready—you&apos;ll draw on this phone. When your round starts, draw as fast as you can and send as many
               creatures as you can.
             </p>
-            <div className="participant-team-picker" role="group" aria-label="Your team for this game">
-              <p className="participant-team-picker-title">Your team</p>
-              <p className="participant-team-picker-hint">Pick the same team you&apos;re paired with (two phones per team).</p>
-              <div className="participant-team-picker-row">
-                <button
-                  type="button"
-                  className={`participant-team-btn${participantTeam === 1 ? ' is-selected' : ''}`}
-                  onClick={() => setParticipantTeam(1)}
-                  aria-pressed={participantTeam === 1}
-                >
-                  Team 1
-                </button>
-                <button
-                  type="button"
-                  className={`participant-team-btn${participantTeam === 2 ? ' is-selected' : ''}`}
-                  onClick={() => setParticipantTeam(2)}
-                  aria-pressed={participantTeam === 2}
-                >
-                  Team 2
-                </button>
-              </div>
-            </div>
+            <p className="participant-assigned-team" role="status" aria-live="polite">
+              You&apos;re on <strong>Team {assignedTeam}</strong>
+            </p>
           </div>
         </div>
       ) : null}
@@ -2476,11 +2412,11 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, parti
               {gm.roundEndAt ? formatRoundClock(gm.roundEndAt) : '—'}
             </span>
           </div>
-          {participantTeam != null && !myTurnToDraw ? (
+          {!myTurnToDraw ? (
             <div className="participant-sitout-card">
               <p className="participant-sitout-title">Team {gm.phase === 'team1' ? 1 : 2}&apos;s draw round</p>
               <p className="participant-sitout-copy">
-                You&apos;re on Team {participantTeam}. This timed round is for the other pair — watch the main screen until
+                You&apos;re on Team {assignedTeam}. This timed round is for the other pair — watch the main screen until
                 it&apos;s your team&apos;s turn.
               </p>
             </div>
@@ -2559,7 +2495,6 @@ export default function App() {
   const [mode, setMode] = useState(initial.mode);
   const [roomInput, setRoomInput] = useState(initial.roomInput);
   const [clientName, setClientName] = useState('');
-  const [participantTeam, setParticipantTeamState] = useState(null);
   const clientId = useMemo(() => crypto.randomUUID(), []);
   const clientColor = useMemo(() => COLORS[Math.floor(Math.random() * COLORS.length)], []);
 
@@ -2569,22 +2504,11 @@ export default function App() {
     preloadSceneBackgroundArt();
   }, []);
 
-  useEffect(() => {
-    if (room && mode === 'participant') setParticipantTeamState(readStoredParticipantTeam(room));
-    else setParticipantTeamState(null);
-  }, [room, mode]);
-
-  const setParticipantTeam = useCallback((t) => {
-    writeStoredParticipantTeam(room, t);
-    setParticipantTeamState(t);
-  }, [room]);
-
   const shared = useSharedRoom(room, {
     clientId,
     name: clientName || (mode === 'host' ? 'Host' : 'Anonymous'),
     role: mode || 'participant',
     color: clientColor,
-    team: mode === 'participant' ? participantTeam : undefined,
   });
 
   if (!room || !mode) {
@@ -2628,8 +2552,7 @@ export default function App() {
       clientName={clientName}
       setClientName={setClientName}
       clientColor={clientColor}
-      participantTeam={participantTeam}
-      setParticipantTeam={setParticipantTeam}
+      clientId={clientId}
     />
   );
 }
