@@ -1648,7 +1648,6 @@ function ParticipantHowToModal({ open, onClose }) {
       >
         <div className="participant-howto-panel-header">
           <h2 id="participant-howto-title" className="participant-howto-brand">
-            <span className="participant-howto-welcome">Welcome to</span>
             <span className="participant-howto-clockit">Clockit</span>
           </h2>
           <button type="button" className="participant-howto-close" onClick={onClose} aria-label="Close instructions">
