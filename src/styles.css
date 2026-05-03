@@ -670,6 +670,15 @@ p {
   color: rgba(255, 255, 255, 0.55);
 }
 
+.host-flow-qr-explainer {
+  margin: 0;
+  max-width: 20rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+}
+
 .host-flow-scene {
   display: flex;
   flex-direction: column;

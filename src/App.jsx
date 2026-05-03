@@ -1854,11 +1854,17 @@ function HostView({ room, shared, onResetRoom }) {
       {howToOpen ? <HowToPlayModal open onClose={() => setHowToOpen(false)} /> : null}
 
       {g.phase === 'splash' ? (
-        <div className="host-flow-overlay host-flow-overlay--splash" aria-label="ClockIt start">
+        <div
+          className="host-flow-overlay host-flow-overlay--splash"
+          aria-label="ClockIt — scan the code with a phone to join this room"
+        >
           <div className="host-flow-splash-split">
             <div className="host-flow-inner host-flow-inner--splash-card">
               <p className="clockit-wordmark">ClockIt</p>
-              <p className="host-flow-subtitle">Scan to join this room</p>
+              <p className="host-flow-subtitle">Teammates join on their phones</p>
+              <p className="host-flow-qr-explainer">
+                Scan this code with a phone camera—it opens the room in the browser (no app needed).
+              </p>
               <QRCodeSVG value={joinUrl} size={200} bgColor="transparent" fgColor="#ffffff" />
               <div className="host-flow-scene">
                 <select
@@ -2113,7 +2119,7 @@ function HostView({ room, shared, onResetRoom }) {
 
       {g.phase !== 'splash' && !showPlayHud ? (
         <div className="qr-corner">
-          <div className="qr-label">Scan to join</div>
+          <div className="qr-label">Join on your phone</div>
           <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
         </div>
       ) : null}
