@@ -371,7 +371,7 @@ p {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
-  color: rgba(0, 212, 255, 0.95);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .host-game-winner {
@@ -379,7 +379,7 @@ p {
   text-align: center;
   font-weight: 800;
   font-size: 0.875rem;
-  color: rgba(254, 240, 138, 0.95);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .host-game-actions {
@@ -450,16 +450,6 @@ p {
   white-space: nowrap;
 }
 
-.host-play-active.is-team1 {
-  color: rgba(0, 212, 255, 0.98);
-  text-shadow: 0 0 48px rgba(0, 212, 255, 0.35);
-}
-
-.host-play-active.is-team2 {
-  color: rgba(254, 240, 138, 0.98);
-  text-shadow: 0 0 48px rgba(254, 240, 138, 0.2);
-}
-
 .host-play-scores {
   display: flex;
   flex: 1 1 auto;
@@ -484,16 +474,10 @@ p {
   border: 2px solid rgba(255, 255, 255, 0.1);
 }
 
-.host-play-score-block.is-team1-active {
-  border-color: rgba(0, 212, 255, 0.55);
-  background: rgba(0, 212, 255, 0.12);
-  box-shadow: 0 0 32px rgba(0, 212, 255, 0.15);
-}
-
-.host-play-score-block.is-team2-active {
-  border-color: rgba(254, 240, 138, 0.45);
-  background: rgba(254, 240, 138, 0.08);
-  box-shadow: 0 0 32px rgba(254, 240, 138, 0.12);
+.host-play-score-block.is-active {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.12);
 }
 
 .host-play-score-label {
@@ -555,7 +539,7 @@ p {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.97);
-  text-shadow: 0 0 40px rgba(0, 212, 255, 0.25);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.65);
 }
 
 .clockit-wordmark--small {
@@ -575,15 +559,15 @@ p {
   font-weight: 800;
   letter-spacing: 0.2em;
   font-variant-numeric: tabular-nums;
-  color: rgba(0, 212, 255, 0.9);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .host-flow-play {
   margin-top: 8px;
   padding: 16px 48px;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.35), rgba(0, 180, 220, 0.2));
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
   font: inherit;
   font-size: 1.15rem;
@@ -614,7 +598,7 @@ p {
   font-weight: 900;
   letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.96);
-  text-shadow: 0 0 48px rgba(0, 212, 255, 0.35);
+  text-shadow: 0 4px 32px rgba(0, 0, 0, 0.75);
   animation: host-countdown-pop 0.35s ease-out;
 }
 
@@ -638,7 +622,7 @@ p {
   margin: 0;
   font-size: clamp(2rem, 6vw, 3rem);
   font-weight: 900;
-  color: rgba(254, 240, 138, 0.95);
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .host-flow-results-score {
@@ -708,7 +692,7 @@ p {
   margin: 12px 0 20px;
   font-size: clamp(1.35rem, 4vw, 2rem);
   font-weight: 900;
-  color: rgba(0, 212, 255, 0.95);
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .participant-flow-overlay {
@@ -754,7 +738,7 @@ p {
   font-size: clamp(2.5rem, 12vw, 5rem);
   font-weight: 900;
   color: rgba(255, 255, 255, 0.95);
-  text-shadow: 0 0 32px rgba(0, 212, 255, 0.3);
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.75);
 }
 
 .participant-flow-overlay--results {
@@ -765,7 +749,7 @@ p {
   margin: 0;
   font-size: 1.75rem;
   font-weight: 900;
-  color: rgba(254, 240, 138, 0.95);
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .participant-flow-results-score {
@@ -809,7 +793,7 @@ p {
   margin: 0;
   font-size: 1.2rem;
   font-weight: 800;
-  color: rgba(0, 212, 255, 0.9);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .host-hud {
@@ -884,8 +868,8 @@ p {
 }
 
 .hud-btn-active {
-  color: rgba(0, 212, 255, 0.9) !important;
-  background: rgba(0, 212, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.98) !important;
+  background: rgba(255, 255, 255, 0.14) !important;
 }
 
 .hud-field {
@@ -911,7 +895,7 @@ p {
 
 .hud-select:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.35);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45);
 }
 
 .hud-camera-control {
@@ -976,7 +960,7 @@ p {
   width: 92px;
   min-width: 92px;
   height: 4px;
-  accent-color: #00d4ff;
+  accent-color: #ffffff;
   cursor: pointer;
 }
 
@@ -1084,12 +1068,12 @@ p {
 .fingertip-cursor.is-grabbing {
   width: 38px;
   height: 38px;
-  background: #fef08a;
+  background: #ffffff;
   border-color: #0f172a;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.95),
     0 3px 14px rgba(0, 0, 0, 0.5),
-    0 0 24px rgba(254, 240, 138, 0.55);
+    0 0 24px rgba(255, 255, 255, 0.45);
 }
 
 .qr-corner {
@@ -1205,8 +1189,8 @@ p {
 
 .participant-howto-trigger:focus {
   outline: none;
-  border-color: rgba(0, 212, 255, 0.45);
-  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
 }
 
 .participant-howto-backdrop {
@@ -1234,7 +1218,7 @@ p {
   color: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    0 0 0 1px rgba(0, 212, 255, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
     0 24px 48px rgba(0, 0, 0, 0.45);
   outline: none;
 }
@@ -1384,8 +1368,8 @@ p {
 
 .participant-scene-select:focus {
   outline: none;
-  border-color: rgba(0,212,255,0.45);
-  box-shadow: 0 0 0 2px rgba(0,212,255,0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }
 
 .participant-scene-select option {

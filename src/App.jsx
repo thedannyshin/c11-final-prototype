@@ -1806,15 +1806,15 @@ function HostView({ room, shared, onResetRoom }) {
 
       {showPlayHud ? (
         <div className="host-play-overlay" aria-live="polite">
-          <p className={`host-play-active${g.phase === 'team1' ? ' is-team1' : ' is-team2'}`}>
+          <p className="host-play-active">
             {g.phase === 'team1' ? 'Team 1' : 'Team 2'}
           </p>
           <div className="host-play-scores">
-            <div className={`host-play-score-block${g.phase === 'team1' ? ' is-team1-active' : ''}`}>
+            <div className={`host-play-score-block${g.phase === 'team1' ? ' is-active' : ''}`}>
               <span className="host-play-score-label">Team 1</span>
               <span className="host-play-score-num">{g.team1Score}</span>
             </div>
-            <div className={`host-play-score-block${g.phase === 'team2' ? ' is-team2-active' : ''}`}>
+            <div className={`host-play-score-block${g.phase === 'team2' ? ' is-active' : ''}`}>
               <span className="host-play-score-label">Team 2</span>
               <span className="host-play-score-num">{g.team2Score}</span>
             </div>
