@@ -1489,6 +1489,7 @@ function HostView({ room, shared, onResetRoom }) {
   const hostRootRef = useRef(null);
   const [hostFullscreen, setHostFullscreen] = useState(false);
   const [hudIdleHidden, setHudIdleHidden] = useState(false);
+  const [howToOpen, setHowToOpen] = useState(false);
   const hudIdleTimerRef = useRef(null);
 
   musicVolumeRef.current = musicVolume;
@@ -1743,23 +1744,21 @@ function HostView({ room, shared, onResetRoom }) {
     >
       <audio ref={audioRef} loop preload="metadata" />
 
+      <HowToPlayModal open={howToOpen} onClose={() => setHowToOpen(false)} />
+
       {g.phase === 'splash' ? (
         <div className="host-flow-overlay host-flow-overlay--splash" aria-label="ClockIt start">
           <div className="host-flow-inner">
             <p className="clockit-wordmark">ClockIt</p>
             <p className="host-flow-subtitle">Scan to join this room</p>
             <QRCodeSVG value={joinUrl} size={200} bgColor="#ffffff" fgColor="#050e18" />
-            <p className="host-flow-room">{room}</p>
             <div className="host-flow-scene">
-              <label htmlFor="host-splash-scene" className="host-flow-scene-label">
-                Big screen background
-              </label>
               <select
                 id="host-splash-scene"
                 className="host-flow-scene-select"
                 value={shared.roomBackground}
                 onChange={(e) => shared.setRoomBackground(e.target.value)}
-                aria-label="Big screen background"
+                aria-label="Background for the big screen"
               >
                 {HOST_SCENE_OPTIONS.map(({ id, label }) => (
                   <option key={id} value={id}>
@@ -1768,6 +1767,9 @@ function HostView({ room, shared, onResetRoom }) {
                 ))}
               </select>
             </div>
+            <button type="button" className="host-flow-howto" onClick={() => setHowToOpen(true)}>
+              How to play
+            </button>
             <button type="button" className="host-flow-play" onClick={() => shared.gamePlayFromSplash()}>
               Play
             </button>
@@ -1980,8 +1982,13 @@ function HostView({ room, shared, onResetRoom }) {
         <div className="qr-corner">
           <div className="qr-label">Scan to join</div>
           <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
-          <div className="qr-room">{room}</div>
         </div>
+      ) : null}
+
+      {g.phase !== 'splash' ? (
+        <button type="button" className="host-howto-floating" onClick={() => setHowToOpen(true)}>
+          How to play
+        </button>
       ) : null}
 
       <HeldCreatureOverlay creature={heldCreature} pos={fingertipPos} />
@@ -1996,14 +2003,14 @@ function HostView({ room, shared, onResetRoom }) {
   );
 }
 
-const PARTICIPANT_HOW_TO_STEPS = [
+const GAME_HOW_TO_STEPS = [
   `Two teams take turns. Each team has one person at the big screen (pinch-drag creatures into the right panel) and one artist on a phone.`,
   `The host picks the big-screen background and starts the match. Team 1 gets a countdown, then two minutes; then Team 2. Drawings are cleared between teams.`,
   `Sending a drawing earns ${GAME_POINTS_DRAW} points for the active team. Moving a creature into the right panel earns ${GAME_POINTS_MOVE} points.`,
   'After both rounds, the host shows the final scores and winner.',
 ];
 
-function ParticipantHowToModal({ open, onClose }) {
+function HowToPlayModal({ open, onClose }) {
   const panelRef = useRef(null);
 
   useEffect(() => {
@@ -2026,7 +2033,7 @@ function ParticipantHowToModal({ open, onClose }) {
 
   return (
     <div
-      className="participant-howto-backdrop"
+      className="howto-modal-backdrop"
       role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -2034,23 +2041,23 @@ function ParticipantHowToModal({ open, onClose }) {
     >
       <div
         ref={panelRef}
-        className="participant-howto-panel"
+        className="howto-modal-panel"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="participant-howto-title"
+        aria-labelledby="howto-play-title"
         tabIndex={-1}
       >
-        <div className="participant-howto-panel-header">
-          <h2 id="participant-howto-title" className="participant-howto-brand">
-            <span className="participant-howto-clockit">Clockit</span>
+        <div className="howto-modal-panel-header">
+          <h2 id="howto-play-title" className="howto-modal-brand">
+            <span className="howto-modal-clockit">ClockIt</span>
           </h2>
-          <button type="button" className="participant-howto-close" onClick={onClose} aria-label="Close instructions">
+          <button type="button" className="howto-modal-close" onClick={onClose} aria-label="Close instructions">
             ×
           </button>
         </div>
-        <h3 className="participant-howto-subtitle">How to play</h3>
-        <ol className="participant-howto-list">
-          {PARTICIPANT_HOW_TO_STEPS.map((text, i) => (
+        <h3 className="howto-modal-subtitle">How to play</h3>
+        <ol className="howto-modal-list">
+          {GAME_HOW_TO_STEPS.map((text, i) => (
             <li key={i}>{text}</li>
           ))}
         </ol>
@@ -2060,7 +2067,6 @@ function ParticipantHowToModal({ open, onClose }) {
 }
 
 function ParticipantView({ shared, clientName, setClientName, clientColor }) {
-  const [howToOpen, setHowToOpen] = useState(false);
   const [, forceClockTick] = useState(0);
   const scene = normalizeRoomBackground(shared.roomBackground);
   const bgUrl = HOST_BG_BY_SCENE[scene] ?? HOST_BG_BY_SCENE.water;
@@ -2081,21 +2087,10 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
       data-scene={scene}
       style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
     >
-      <ParticipantHowToModal open={howToOpen} onClose={() => setHowToOpen(false)} />
-
       {gm.phase === 'splash' ? (
         <div className="participant-flow-overlay participant-flow-overlay--splash">
           <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
           <p className="participant-flow-wait">Waiting for the host to tap Play…</p>
-          <button
-            type="button"
-            className="participant-howto-trigger participant-howto-trigger--splash"
-            onClick={() => setHowToOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={howToOpen}
-          >
-            How to play
-          </button>
         </div>
       ) : null}
 
@@ -2144,15 +2139,6 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
             <span className="participant-round-timer" aria-live="polite">
               {gm.roundEndAt ? formatRoundClock(gm.roundEndAt) : '—'}
             </span>
-            <button
-              type="button"
-              className="participant-howto-trigger"
-              onClick={() => setHowToOpen(true)}
-              aria-haspopup="dialog"
-              aria-expanded={howToOpen}
-            >
-              How to play
-            </button>
           </div>
           <DrawingPad onCommit={shared.addCharacter} />
         </>
