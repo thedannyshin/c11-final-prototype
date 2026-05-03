@@ -158,6 +158,8 @@ function preloadSceneBackgroundArt() {
 function ParticipantSplashBackdrop({ active, lockedSceneId }) {
   const [idx, setIdx] = useState(0);
   const [blend, setBlend] = useState(0);
+  /** One paint: remap layers without opacity transition (avoids post-crossfade jitter). */
+  const [instantSwap, setInstantSwap] = useState(false);
 
   const slideshow = active && lockedSceneId == null;
 
@@ -165,23 +167,27 @@ function ParticipantSplashBackdrop({ active, lockedSceneId }) {
     if (!slideshow) {
       setIdx(0);
       setBlend(0);
+      setInstantSwap(false);
       return undefined;
     }
     setIdx(0);
     setBlend(0);
+    setInstantSwap(false);
     const id = window.setInterval(() => {
       setBlend(1);
       window.setTimeout(() => {
+        setInstantSwap(true);
         setIdx((i) => (i + 1) % HOST_SCENE_OPTIONS.length);
         setBlend(0);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setInstantSwap(false));
+        });
       }, SPLASH_CROSSFADE_MS);
     }, SPLASH_ZOOM_CYCLE_MS);
     return () => window.clearInterval(id);
   }, [slideshow]);
 
   if (!active) return null;
-
-  const tf = `opacity ${SPLASH_CROSSFADE_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`;
 
   if (lockedSceneId != null) {
     const id = normalizeRoomBackground(lockedSceneId);
@@ -207,8 +213,15 @@ function ParticipantSplashBackdrop({ active, lockedSceneId }) {
   const urlBottom = HOST_BG_BY_SCENE[sceneBottom];
   const urlTop = HOST_BG_BY_SCENE[sceneTop];
 
+  const rootCls = [
+    'participant-splash-bg',
+    instantSwap ? 'participant-splash-bg--instant-swap' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div className="participant-splash-bg" aria-hidden>
+    <div className={rootCls} aria-hidden>
       <div className="participant-splash-bg-zoom">
         <div
           className="participant-splash-bg-layer"
@@ -216,7 +229,6 @@ function ParticipantSplashBackdrop({ active, lockedSceneId }) {
           style={{
             opacity: 1 - blend,
             backgroundImage: `url('${urlBottom}')`,
-            transition: tf,
           }}
         />
         <div
@@ -225,7 +237,6 @@ function ParticipantSplashBackdrop({ active, lockedSceneId }) {
           style={{
             opacity: blend,
             backgroundImage: `url('${urlTop}')`,
-            transition: tf,
           }}
         />
       </div>
