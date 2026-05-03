@@ -2079,14 +2079,14 @@ function HostView({ room, shared, onResetRoom }) {
           <p className="host-flow-results-hero">Time&apos;s Up!</p>
           <p className="host-flow-results-score">Team 2 — {g.team2Score} pts</p>
           <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToFinal()}>
-            Continue
+            See the Winner
           </button>
         </div>
       ) : null}
 
       {g.phase === 'final' ? (
         <div className="host-flow-overlay host-flow-overlay--final">
-          <ClockItLogo variant="small" />
+          <ClockItLogo />
           <div className="host-flow-final-grid">
             <div className="host-flow-final-box">
               <span className="host-flow-final-label">Team 1</span>
