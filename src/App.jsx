@@ -2130,7 +2130,9 @@ function HostView({ room, shared, onResetRoom }) {
             {g.roundEndAt ? <p className="host-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
           </div>
           <p key={`host-pinch-hint-${g.phase}`} className="host-play-hint">
-            Pinch to grab creatures and move them to the right side.
+            Pinch to grab creatures and move
+            <br />
+            them to the right side.
           </p>
         </div>
       ) : null}
@@ -2277,16 +2279,6 @@ function HostView({ room, shared, onResetRoom }) {
           </select>
         </div>
       </div>
-      ) : null}
-
-      {g.phase !== 'splash' &&
-      !showPlayHud &&
-      g.phase !== 'countdown_team1' &&
-      g.phase !== 'countdown_team2' ? (
-        <div className="qr-corner">
-          <div className="qr-label">Join on your phone</div>
-          <QRCodeSVG value={joinUrl} size={84} bgColor="transparent" fgColor="#ffffff" />
-        </div>
       ) : null}
 
       <HeldCreatureOverlay creature={heldCreature} pos={fingertipPos} />

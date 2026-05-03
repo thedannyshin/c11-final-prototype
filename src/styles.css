@@ -1382,31 +1382,6 @@ p {
     0 0 24px rgba(255, 255, 255, 0.45);
 }
 
-.qr-corner {
-  position: absolute;
-  top: 20px;
-  /* Flush to viewport right (side panel occupies ~30% — QR sits in that strip). */
-  right: 20px;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 12px;
-  background: rgba(5, 14, 28, 0.55);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 18px;
-}
-
-.qr-label {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.45);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
 .swatches {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
