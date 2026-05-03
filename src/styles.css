@@ -1044,20 +1044,37 @@ p {
 .participant-splash-bg-zoom {
   position: absolute;
   inset: -10%;
-  /* Slightly longer than slide interval so zoom phase doesn’t align every swap (reduces hitch). */
-  animation: participant-splash-bg-zoom 6.25s ease-in-out infinite alternate;
-  transform: translateZ(0);
+  isolation: isolate;
+  /*
+   Slideshow: one slow zoom-in per slide (keyed remount in JSX). Avoids alternate-direction reversal
+   exactly when the crossfade fires every SPLASH_ZOOM_CYCLE_MS — that sync caused jitter.
+  */
+  animation: participant-splash-bg-zoom-in var(--participant-splash-zoom-ms, 4500ms) ease-out forwards;
   will-change: transform;
-  backface-visibility: hidden;
 }
 
-@keyframes participant-splash-bg-zoom {
+/* Locked scene: gentle in/out loop (no discrete slide swaps aligned to zoom apex). */
+.participant-splash-bg-zoom--idle {
+  animation: participant-splash-bg-zoom-pulse var(--participant-splash-zoom-ms, 4500ms) linear infinite alternate;
+}
+
+@keyframes participant-splash-bg-zoom-in {
   from {
-    transform: translateZ(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 
   to {
-    transform: translateZ(0) scale(1.07);
+    transform: translate3d(0, 0, 0) scale(1.07);
+  }
+}
+
+@keyframes participant-splash-bg-zoom-pulse {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0) scale(1.07);
   }
 }
 
@@ -1067,14 +1084,17 @@ p {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: 1;
-  transition: opacity 1100ms cubic-bezier(0.65, 0, 0.35, 1);
   transform: translateZ(0);
   backface-visibility: hidden;
 }
 
-.participant-splash-bg--instant-swap .participant-splash-bg-layer {
-  transition: none;
+@media (prefers-reduced-motion: reduce) {
+  .participant-splash-bg-zoom,
+  .participant-splash-bg-zoom--idle {
+    animation: none;
+    transform: translate3d(0, 0, 0) scale(1);
+    will-change: auto;
+  }
 }
 
 .participant-splash-bg-layer[data-scene='grass']::after,
