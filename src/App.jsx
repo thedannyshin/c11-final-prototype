@@ -2477,9 +2477,6 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
               <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
                 <ClockItLogo variant="phone" />
                 <p className="participant-flow-results-title">Room is full</p>
-                <p className="participant-flow-wait">
-                  Two phones are already assigned (Team 1 and Team 2). Watch the host screen.
-                </p>
               </div>
             )
           ) : (
