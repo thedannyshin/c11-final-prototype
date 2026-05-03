@@ -2059,7 +2059,6 @@ function HostView({ room, shared, onResetRoom }) {
             <div className="host-flow-splash-copy">
               <p className="host-flow-splash-lead host-flow-splash-lead--head">2 teams · 2 players each</p>
               <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
-              <p className="host-flow-splash-lead">Pinch where the glow sits — stages, Play, top bar</p>
               <p className="host-flow-splash-lead">Artist → scan the QR below</p>
             </div>
             <QRCodeSVG value={joinUrl} size={96} bgColor="transparent" fgColor="#ffffff" />

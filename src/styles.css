@@ -617,7 +617,8 @@ p {
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  pointer-events: none;
+  /* Catch taps outside the card so the full-screen aquarium canvas cannot steal touches / pinches. */
+  pointer-events: auto;
 }
 
 .host-flow-inner--splash-card {
@@ -1181,6 +1182,32 @@ p {
 /* Above .host-flow-overlay (z-index 100) on splash — wins over base .host-hud z-index */
 .host-hud.host-hud--start-screen {
   z-index: 110;
+  padding: 14px 22px;
+  gap: 14px;
+  row-gap: 10px;
+}
+
+.host-hud.host-hud--start-screen .hud-btn--icon {
+  min-width: 52px;
+  min-height: 52px;
+  padding: 12px 14px;
+}
+
+.host-hud.host-hud--start-screen .hud-divider {
+  height: 32px;
+}
+
+.host-hud.host-hud--start-screen .hud-icon-svg {
+  transform: scale(1.15);
+  transform-origin: center;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .host-hud.host-hud--start-screen .hud-volume-rail input[type='range'] {
+    min-height: 36px;
+    padding: 14px 0;
+    box-sizing: border-box;
+  }
 }
 
 .host-hud--idle-hidden {
@@ -1357,6 +1384,10 @@ p {
 
 .host-layout--splash .aquarium-wrapper {
   flex: 1 1 100%;
+}
+
+.host-layout--splash .aquarium-canvas {
+  pointer-events: none;
 }
 
 /* Side panel flex:3 vs aquarium flex:7 = 30% / 70%. Must match SHOWCASE_WIDTH_FRAC in App.jsx */
