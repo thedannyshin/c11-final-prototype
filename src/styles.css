@@ -416,6 +416,299 @@ p {
   color: rgba(255, 255, 255, 0.55);
 }
 
+.host-game-bar--compact {
+  max-width: min(96vw, 520px);
+  padding: 8px 14px;
+  gap: 8px 12px;
+}
+
+/* Full-screen game flow (splash, countdown, results, final) */
+.host-flow-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 5, 10, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.host-flow-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+  max-width: 22rem;
+}
+
+.clockit-wordmark {
+  margin: 0;
+  font-size: clamp(2.5rem, 8vw, 3.75rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.97);
+  text-shadow: 0 0 40px rgba(0, 212, 255, 0.25);
+}
+
+.clockit-wordmark--small {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  margin-bottom: 0.5rem;
+}
+
+.host-flow-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.host-flow-room {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(0, 212, 255, 0.9);
+}
+
+.host-flow-play {
+  margin-top: 8px;
+  padding: 16px 48px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.35), rgba(0, 180, 220, 0.2));
+  color: #fff;
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.host-flow-play:hover {
+  filter: brightness(1.08);
+}
+
+.host-flow-overlay--countdown {
+  background: rgba(2, 5, 10, 0.88);
+}
+
+.host-flow-countdown-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 30vh;
+}
+
+.host-flow-countdown-line {
+  font-size: clamp(3rem, 14vw, 7rem);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 0 48px rgba(0, 212, 255, 0.35);
+  animation: host-countdown-pop 0.35s ease-out;
+}
+
+@keyframes host-countdown-pop {
+  from {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.host-flow-overlay--results {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.host-flow-results-hero {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 900;
+  color: rgba(254, 240, 138, 0.95);
+}
+
+.host-flow-results-score {
+  margin: 0;
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.host-flow-continue {
+  margin-top: 24px;
+  padding: 14px 36px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.host-flow-continue:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.host-flow-overlay--final {
+  flex-direction: column;
+  text-align: center;
+}
+
+.host-flow-final-grid {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 20px 0 8px;
+}
+
+.host-flow-final-box {
+  min-width: 9rem;
+  padding: 20px 24px;
+  border-radius: 20px;
+  background: rgba(5, 14, 28, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.host-flow-final-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.host-flow-final-num {
+  font-size: 2.5rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.host-flow-final-winner {
+  margin: 12px 0 20px;
+  font-size: clamp(1.35rem, 4vw, 2rem);
+  font-weight: 900;
+  color: rgba(0, 212, 255, 0.95);
+}
+
+.participant-flow-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  background: rgba(2, 5, 10, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.participant-flow-overlay--splash {
+  gap: 16px;
+}
+
+.clockit-wordmark--phone {
+  font-size: clamp(1.75rem, 6vw, 2.5rem);
+}
+
+.participant-flow-wait {
+  margin: 0;
+  max-width: 16rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.participant-howto-trigger--splash {
+  margin-top: 8px;
+}
+
+.participant-flow-overlay--countdown {
+  z-index: 50;
+}
+
+.participant-flow-countdown-line {
+  font-size: clamp(2.5rem, 12vw, 5rem);
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 0 32px rgba(0, 212, 255, 0.3);
+}
+
+.participant-flow-overlay--results {
+  gap: 8px;
+}
+
+.participant-flow-results-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 900;
+  color: rgba(254, 240, 138, 0.95);
+}
+
+.participant-flow-results-score {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.participant-flow-overlay--final {
+  gap: 12px;
+}
+
+.participant-flow-final-grid {
+  display: flex;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.participant-flow-final-box {
+  flex: 1;
+  min-width: 6.5rem;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(5, 14, 28, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.participant-flow-final-box strong {
+  font-size: 1.75rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.participant-flow-winner {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: rgba(0, 212, 255, 0.9);
+}
+
 .host-hud {
   position: absolute;
   right: 20px;

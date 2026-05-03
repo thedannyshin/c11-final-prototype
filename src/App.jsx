@@ -21,24 +21,60 @@ const GAME_ROUND_MS = 2 * 60 * 1000;
 const GAME_POINTS_DRAW = 10;
 const GAME_POINTS_MOVE = 10;
 
+const GAME_PHASES = [
+  'splash',
+  'countdown_team1',
+  'team1',
+  'results_team1',
+  'countdown_team2',
+  'team2',
+  'results_team2',
+  'final',
+];
+
 function defaultGameState() {
   return {
-    phase: 'idle',
+    phase: 'splash',
     team1Score: 0,
     team2Score: 0,
     roundEndAt: null,
+    countdownStep: null,
   };
 }
 
 function normalizeGameState(raw) {
   if (!raw || typeof raw !== 'object') return defaultGameState();
-  const phase = ['idle', 'team1', 'between', 'team2', 'done'].includes(raw.phase) ? raw.phase : 'idle';
+  let phase = raw.phase;
+  const legacyMap = { idle: 'splash', between: 'splash', done: 'final' };
+  if (legacyMap[phase]) phase = legacyMap[phase];
+  if (!GAME_PHASES.includes(phase)) phase = 'splash';
+  let countdownStep = raw.countdownStep;
+  if (countdownStep === '' || Number.isNaN(Number(countdownStep))) countdownStep = null;
+  else countdownStep = Math.min(4, Math.max(0, Number(countdownStep)));
   return {
     phase,
     team1Score: Math.max(0, Number(raw.team1Score) || 0),
     team2Score: Math.max(0, Number(raw.team2Score) || 0),
     roundEndAt: raw.roundEndAt == null || raw.roundEndAt === '' ? null : Number(raw.roundEndAt),
+    countdownStep,
   };
+}
+
+/** Big on-screen text during synced countdown (0 = Get Ready, 1–3 = numbers, 4 = Go). */
+function getCountdownDisplay(game) {
+  const step = game.countdownStep == null ? 0 : game.countdownStep;
+  const teamLine =
+    game.phase === 'countdown_team1' ? 'Get ready — Team 1' : 'Get ready — Team 2';
+  if (step === 0) return { line1: teamLine, line2: null };
+  if (step === 1) return { line1: '3', line2: null };
+  if (step === 2) return { line1: '2', line2: null };
+  if (step === 3) return { line1: '1', line2: null };
+  return { line1: 'Go!', line2: null };
+}
+
+function getWinnerPhrase(team1Score, team2Score) {
+  if (team1Score === team2Score) return "It's a tie!";
+  return team1Score > team2Score ? 'Team 1 wins!' : 'Team 2 wins!';
 }
 
 function formatRoundClock(roundEndAt) {
@@ -786,25 +822,35 @@ function useSharedRoom(roomId, client) {
         });
       }
     },
-    gameStartTeam1() {
+    gameSetCountdownStep(step) {
+      transportRef.current?.send({
+        type: 'game:update',
+        payload: { countdownStep: Math.min(4, Math.max(0, step)) },
+      });
+    },
+    /** Splash → countdown Team 1 (scores reset). Clears all drawings. */
+    gamePlayFromSplash() {
       sendCanvasClear();
       transportRef.current?.send({
         type: 'game:set',
         payload: {
-          phase: 'team1',
+          phase: 'countdown_team1',
           team1Score: 0,
           team2Score: 0,
-          roundEndAt: Date.now() + GAME_ROUND_MS,
+          countdownStep: 0,
+          roundEndAt: null,
         },
       });
     },
-    gameStartTeam2() {
+    /** After 3–2–1–Go — start the 2:00 round (canvas cleared). */
+    gameStartPlayRound(teamNum) {
       sendCanvasClear();
       transportRef.current?.send({
         type: 'game:update',
         payload: {
-          phase: 'team2',
+          phase: teamNum === 1 ? 'team1' : 'team2',
           roundEndAt: Date.now() + GAME_ROUND_MS,
+          countdownStep: null,
         },
       });
     },
@@ -814,15 +860,37 @@ function useSharedRoom(roomId, client) {
         sendCanvasClear();
         transportRef.current?.send({
           type: 'game:update',
-          payload: { phase: 'between', roundEndAt: null },
+          payload: { phase: 'results_team1', roundEndAt: null, countdownStep: null },
         });
       } else if (g.phase === 'team2') {
         sendCanvasClear();
         transportRef.current?.send({
           type: 'game:update',
-          payload: { phase: 'done', roundEndAt: null },
+          payload: { phase: 'results_team2', roundEndAt: null, countdownStep: null },
         });
       }
+    },
+    /** Results team 1 → countdown team 2. Clears drawings between teams. */
+    gameContinueToTeam2() {
+      sendCanvasClear();
+      transportRef.current?.send({
+        type: 'game:update',
+        payload: { phase: 'countdown_team2', countdownStep: 0, roundEndAt: null },
+      });
+    },
+    /** Results team 2 → final scoreboard. */
+    gameContinueToFinal() {
+      transportRef.current?.send({
+        type: 'game:update',
+        payload: { phase: 'final', roundEndAt: null, countdownStep: null },
+      });
+    },
+    gameBackToSplash() {
+      sendCanvasClear();
+      transportRef.current?.send({
+        type: 'game:set',
+        payload: defaultGameState(),
+      });
     },
     gameResetMatch() {
       sendCanvasClear();
@@ -1361,6 +1429,39 @@ function HostView({ room, shared, onResetRoom }) {
     return () => window.clearInterval(id);
   }, []);
 
+  const countdownRunIdRef = useRef(0);
+  useEffect(() => {
+    const p = shared.game.phase;
+    if (p !== 'countdown_team1' && p !== 'countdown_team2') return undefined;
+
+    const runId = ++countdownRunIdRef.current;
+    const timers = [];
+    const safe = (fn) => {
+      if (countdownRunIdRef.current !== runId) return;
+      fn();
+    };
+
+    timers.push(window.setTimeout(() => safe(() => sharedRef.current.gameSetCountdownStep(1)), 1000));
+    timers.push(window.setTimeout(() => safe(() => sharedRef.current.gameSetCountdownStep(2)), 2000));
+    timers.push(window.setTimeout(() => safe(() => sharedRef.current.gameSetCountdownStep(3)), 3000));
+    timers.push(window.setTimeout(() => safe(() => sharedRef.current.gameSetCountdownStep(4)), 4000));
+    timers.push(
+      window.setTimeout(
+        () =>
+          safe(() => {
+            const team = p === 'countdown_team1' ? 1 : 2;
+            sharedRef.current.gameStartPlayRound(team);
+          }),
+        5000,
+      ),
+    );
+
+    return () => {
+      countdownRunIdRef.current++;
+      timers.forEach((t) => window.clearTimeout(t));
+    };
+  }, [shared.game.phase]);
+
   const [playing, setPlaying] = useState(false);
   const [musicVolume, setMusicVolume] = useState(() => {
     try {
@@ -1504,6 +1605,13 @@ function HostView({ room, shared, onResetRoom }) {
     setSideCreatures([]);
   }, [room]);
 
+  useEffect(() => {
+    if (shared.strokes.length > 0) return;
+    hiddenIdsRef.current = new Set();
+    setHiddenIds(new Set());
+    setSideCreatures([]);
+  }, [shared.strokes.length]);
+
   // ── Hand tracking ─────────────────────────────────────────────────────────
   const { fingertipPos, pinchCbRef } = useHandTracking(handEnabled, cameraDeviceId);
 
@@ -1622,24 +1730,8 @@ function HostView({ room, shared, onResetRoom }) {
   const visibleStrokes = shared.strokes.filter((s) => !hiddenIds.has(s.id));
 
   const g = shared.game;
-  const phaseLabel =
-    g.phase === 'idle'
-      ? 'Ready'
-      : g.phase === 'team1'
-        ? 'Team 1 playing'
-        : g.phase === 'between'
-          ? 'Between rounds'
-          : g.phase === 'team2'
-            ? 'Team 2 playing'
-            : 'Match over';
-  const winnerText =
-    g.phase === 'done'
-      ? g.team1Score === g.team2Score
-        ? 'Tie game!'
-        : g.team1Score > g.team2Score
-          ? 'Team 1 wins!'
-          : 'Team 2 wins!'
-      : '';
+  const cd = getCountdownDisplay(g);
+  const showPlayHud = g.phase === 'team1' || g.phase === 'team2';
 
   return (
     <div
@@ -1648,46 +1740,88 @@ function HostView({ room, shared, onResetRoom }) {
     >
       <audio ref={audioRef} loop preload="metadata" />
 
-      <div className="host-game-bar" aria-live="polite">
-        <div className="host-game-scores">
-          <span className="host-game-score">
-            <span className="host-game-score-label">Team 1</span>
-            <span className="host-game-score-val">{g.team1Score}</span>
-          </span>
-          <span className="host-game-score">
-            <span className="host-game-score-label">Team 2</span>
-            <span className="host-game-score-val">{g.team2Score}</span>
-          </span>
+      {g.phase === 'splash' ? (
+        <div className="host-flow-overlay host-flow-overlay--splash" aria-label="ClockIt start">
+          <div className="host-flow-inner">
+            <p className="clockit-wordmark">ClockIt</p>
+            <p className="host-flow-subtitle">Scan to join this room</p>
+            <QRCodeSVG value={joinUrl} size={200} bgColor="#ffffff" fgColor="#050e18" />
+            <p className="host-flow-room">{room}</p>
+            <button type="button" className="host-flow-play" onClick={() => shared.gamePlayFromSplash()}>
+              Play
+            </button>
+          </div>
         </div>
-        <div className="host-game-center">
-          <span className="host-game-phase">{phaseLabel}</span>
-          {(g.phase === 'team1' || g.phase === 'team2') && g.roundEndAt ? (
-            <span className="host-game-timer">{formatRoundClock(g.roundEndAt)}</span>
-          ) : null}
-          {winnerText ? <span className="host-game-winner">{winnerText}</span> : null}
+      ) : null}
+
+      {(g.phase === 'countdown_team1' || g.phase === 'countdown_team2') ? (
+        <div className="host-flow-overlay host-flow-overlay--countdown" aria-live="assertive">
+          <div className="host-flow-countdown-display">
+            <span key={`${g.phase}-${g.countdownStep ?? 0}`} className="host-flow-countdown-line">
+              {cd.line1}
+            </span>
+          </div>
         </div>
-        <div className="host-game-actions">
-          <button
-            type="button"
-            className="host-game-btn"
-            disabled={g.phase !== 'idle' && g.phase !== 'done'}
-            onClick={() => shared.gameStartTeam1()}
-          >
-            Start team 1
-          </button>
-          <button
-            type="button"
-            className="host-game-btn"
-            disabled={g.phase !== 'between'}
-            onClick={() => shared.gameStartTeam2()}
-          >
-            Start team 2
-          </button>
-          <button type="button" className="host-game-btn host-game-btn--ghost" onClick={() => shared.gameResetMatch()}>
-            Reset
+      ) : null}
+
+      {g.phase === 'results_team1' ? (
+        <div className="host-flow-overlay host-flow-overlay--results">
+          <p className="host-flow-results-hero">Time&apos;s Up!</p>
+          <p className="host-flow-results-score">Team 1 — {g.team1Score} pts</p>
+          <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
+            Continue
           </button>
         </div>
-      </div>
+      ) : null}
+
+      {g.phase === 'results_team2' ? (
+        <div className="host-flow-overlay host-flow-overlay--results">
+          <p className="host-flow-results-hero">Time&apos;s Up!</p>
+          <p className="host-flow-results-score">Team 2 — {g.team2Score} pts</p>
+          <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToFinal()}>
+            Continue
+          </button>
+        </div>
+      ) : null}
+
+      {g.phase === 'final' ? (
+        <div className="host-flow-overlay host-flow-overlay--final">
+          <p className="clockit-wordmark clockit-wordmark--small">ClockIt</p>
+          <div className="host-flow-final-grid">
+            <div className="host-flow-final-box">
+              <span className="host-flow-final-label">Team 1</span>
+              <span className="host-flow-final-num">{g.team1Score}</span>
+            </div>
+            <div className="host-flow-final-box">
+              <span className="host-flow-final-label">Team 2</span>
+              <span className="host-flow-final-num">{g.team2Score}</span>
+            </div>
+          </div>
+          <p className="host-flow-final-winner">{getWinnerPhrase(g.team1Score, g.team2Score)}</p>
+          <button type="button" className="host-flow-play" onClick={() => shared.gameBackToSplash()}>
+            Play again
+          </button>
+        </div>
+      ) : null}
+
+      {showPlayHud ? (
+        <div className="host-game-bar host-game-bar--compact" aria-live="polite">
+          <div className="host-game-scores">
+            <span className="host-game-score">
+              <span className="host-game-score-label">Team 1</span>
+              <span className="host-game-score-val">{g.team1Score}</span>
+            </span>
+            <span className="host-game-score">
+              <span className="host-game-score-label">Team 2</span>
+              <span className="host-game-score-val">{g.team2Score}</span>
+            </span>
+          </div>
+          <div className="host-game-center">
+            <span className="host-game-phase">{g.phase === 'team1' ? 'Team 1 — Go!' : 'Team 2 — Go!'}</span>
+            {g.roundEndAt ? <span className="host-game-timer">{formatRoundClock(g.roundEndAt)}</span> : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="host-layout">
         <div className="aquarium-wrapper">
@@ -1811,11 +1945,13 @@ function HostView({ room, shared, onResetRoom }) {
         </div>
       </div>
 
-      <div className="qr-corner">
-        <div className="qr-label">Scan to join</div>
-        <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
-        <div className="qr-room">{room}</div>
-      </div>
+      {g.phase !== 'splash' ? (
+        <div className="qr-corner">
+          <div className="qr-label">Scan to join</div>
+          <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
+          <div className="qr-room">{room}</div>
+        </div>
+      ) : null}
 
       <HeldCreatureOverlay creature={heldCreature} pos={fingertipPos} />
 
@@ -1831,9 +1967,9 @@ function HostView({ room, shared, onResetRoom }) {
 
 const PARTICIPANT_HOW_TO_STEPS = [
   `Two teams take turns. Each team has one person at the big screen (pinch-drag creatures into the right panel) and one artist on a phone.`,
-  `Team 1 plays for 2 minutes, then Team 2 plays for 2 minutes. The host starts each round—only the active team scores.`,
+  `The host starts the match from the big screen. Team 1 gets a countdown, then two minutes; then Team 2. Drawings are cleared between teams.`,
   `Sending a drawing earns ${GAME_POINTS_DRAW} points for the active team. Moving a creature into the right panel earns ${GAME_POINTS_MOVE} points.`,
-  'Highest total score after both rounds wins!',
+  'After both rounds, the host shows the final scores and winner.',
 ];
 
 function ParticipantHowToModal({ open, onClose }) {
@@ -1897,6 +2033,8 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
   const scene = normalizeRoomBackground(shared.roomBackground);
   const bgUrl = HOST_BG_BY_SCENE[scene] ?? HOST_BG_BY_SCENE.water;
   const gm = shared.game;
+  const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
+  const cdPhone = getCountdownDisplay(gm);
 
   const [, forceClockTick] = useState(0);
   useEffect(() => {
@@ -1906,17 +2044,6 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
     return () => window.clearInterval(id);
   }, [gm.phase, gm.roundEndAt]);
 
-  const phonePhase =
-    gm.phase === 'idle'
-      ? 'Waiting for host'
-      : gm.phase === 'team1'
-        ? 'Team 1 is playing'
-        : gm.phase === 'between'
-          ? 'Between rounds'
-          : gm.phase === 'team2'
-            ? 'Team 2 is playing'
-            : 'Match finished';
-
   return (
     <div
       className="participant-shell"
@@ -1924,43 +2051,103 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
       style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
     >
       <ParticipantHowToModal open={howToOpen} onClose={() => setHowToOpen(false)} />
-      <div className="participant-game-banner">
-        <span className="participant-game-phase">{phonePhase}</span>
-        {(gm.phase === 'team1' || gm.phase === 'team2') && gm.roundEndAt ? (
-          <span className="participant-game-timer">{formatRoundClock(gm.roundEndAt)}</span>
-        ) : null}
-        <span className="participant-game-scores">
-          T1 {gm.team1Score} · T2 {gm.team2Score}
-        </span>
-      </div>
-      <div className="participant-header">
-        <span className="participant-room-code">{room}</span>
-        <div className="participant-scene-wrap">
-          <select
-            className="participant-scene-select"
-            value={shared.roomBackground}
-            onChange={(e) => shared.setRoomBackground(e.target.value)}
-            aria-label="Big screen background"
-            title="Change the big screen background"
+
+      {gm.phase === 'splash' ? (
+        <div className="participant-flow-overlay participant-flow-overlay--splash">
+          <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
+          <p className="participant-flow-wait">Waiting for the host to tap Play…</p>
+          <button
+            type="button"
+            className="participant-howto-trigger participant-howto-trigger--splash"
+            onClick={() => setHowToOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={howToOpen}
           >
-            {HOST_SCENE_OPTIONS.map(({ id, label }) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
+            How to play
+          </button>
         </div>
-        <button
-          type="button"
-          className="participant-howto-trigger"
-          onClick={() => setHowToOpen(true)}
-          aria-haspopup="dialog"
-          aria-expanded={howToOpen}
-        >
-          How to play
-        </button>
-      </div>
-      <DrawingPad onCommit={shared.addCharacter} />
+      ) : null}
+
+      {(gm.phase === 'countdown_team1' || gm.phase === 'countdown_team2') ? (
+        <div className="participant-flow-overlay participant-flow-overlay--countdown" aria-live="assertive">
+          <span className="participant-flow-countdown-line" key={`${gm.phase}-${gm.countdownStep ?? 0}`}>
+            {cdPhone.line1}
+          </span>
+        </div>
+      ) : null}
+
+      {gm.phase === 'results_team1' ? (
+        <div className="participant-flow-overlay participant-flow-overlay--results">
+          <p className="participant-flow-results-title">Time&apos;s Up!</p>
+          <p className="participant-flow-results-score">Team 1 — {gm.team1Score} pts</p>
+        </div>
+      ) : null}
+
+      {gm.phase === 'results_team2' ? (
+        <div className="participant-flow-overlay participant-flow-overlay--results">
+          <p className="participant-flow-results-title">Time&apos;s Up!</p>
+          <p className="participant-flow-results-score">Team 2 — {gm.team2Score} pts</p>
+        </div>
+      ) : null}
+
+      {gm.phase === 'final' ? (
+        <div className="participant-flow-overlay participant-flow-overlay--final">
+          <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
+          <div className="participant-flow-final-grid">
+            <div className="participant-flow-final-box">
+              <span>Team 1</span>
+              <strong>{gm.team1Score}</strong>
+            </div>
+            <div className="participant-flow-final-box">
+              <span>Team 2</span>
+              <strong>{gm.team2Score}</strong>
+            </div>
+          </div>
+          <p className="participant-flow-winner">{getWinnerPhrase(gm.team1Score, gm.team2Score)}</p>
+        </div>
+      ) : null}
+
+      {inDrawRound ? (
+        <>
+          <div className="participant-game-banner">
+            <span className="participant-game-phase">{gm.phase === 'team1' ? 'Team 1 — draw!' : 'Team 2 — draw!'}</span>
+            {gm.roundEndAt ? (
+              <span className="participant-game-timer">{formatRoundClock(gm.roundEndAt)}</span>
+            ) : null}
+            <span className="participant-game-scores">
+              T1 {gm.team1Score} · T2 {gm.team2Score}
+            </span>
+          </div>
+          <div className="participant-header">
+            <span className="participant-room-code">{room}</span>
+            <div className="participant-scene-wrap">
+              <select
+                className="participant-scene-select"
+                value={shared.roomBackground}
+                onChange={(e) => shared.setRoomBackground(e.target.value)}
+                aria-label="Big screen background"
+                title="Change the big screen background"
+              >
+                {HOST_SCENE_OPTIONS.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="participant-howto-trigger"
+              onClick={() => setHowToOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={howToOpen}
+            >
+              How to play
+            </button>
+          </div>
+          <DrawingPad onCommit={shared.addCharacter} />
+        </>
+      ) : null}
     </div>
   );
 }
