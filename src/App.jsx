@@ -2188,16 +2188,6 @@ function HostView({ room, shared, onResetRoom }) {
         <button
           type="button"
           className="hud-btn hud-btn--icon"
-          onClick={onResetRoom}
-          aria-label="Restart"
-          title="Restart — new room code"
-        >
-          <HudIconRestart />
-        </button>
-        <span className="hud-divider" />
-        <button
-          type="button"
-          className="hud-btn hud-btn--icon"
           onClick={toggleHostFullscreen}
           aria-label={hostFullscreen ? 'Exit full screen' : 'Full screen'}
           title={hostFullscreen ? 'Exit full screen' : 'Full screen'}
