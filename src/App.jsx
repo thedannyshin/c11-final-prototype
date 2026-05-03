@@ -77,6 +77,22 @@ function getWinnerPhrase(team1Score, team2Score) {
   return team1Score > team2Score ? 'Team 1 wins!' : 'Team 2 wins!';
 }
 
+const CLOCKIT_LOGO_PATH = '/clockit-logo.png';
+
+/** Logo image — only width is scaled; height stays auto so aspect ratio is unchanged */
+function ClockItLogo({ variant = 'default', className = '' }) {
+  const mod =
+    variant === 'small' ? 'clockit-logo--small' : variant === 'phone' ? 'clockit-logo--phone' : '';
+  return (
+    <img
+      src={CLOCKIT_LOGO_PATH}
+      alt="ClockIt"
+      className={['clockit-logo', mod, className].filter(Boolean).join(' ')}
+      decoding="async"
+    />
+  );
+}
+
 function formatRoundClock(roundEndAt) {
   if (roundEndAt == null) return '—';
   const sec = Math.max(0, Math.ceil((roundEndAt - Date.now()) / 1000));
@@ -127,6 +143,8 @@ function preloadSceneBackgroundArt() {
     img.onerror = () => {};
     img.src = src;
   });
+  const logo = new Image();
+  logo.src = CLOCKIT_LOGO_PATH;
 }
 
 /** Phone splash: cycles scene art + crossfade + zoom until host locks a background in Firebase. */
@@ -2013,7 +2031,7 @@ function HostView({ room, shared, onResetRoom }) {
           aria-label="ClockIt — form teams and scan to join"
         >
           <div className="host-flow-inner host-flow-inner--splash-card">
-            <p className="clockit-wordmark">ClockIt</p>
+            <ClockItLogo />
             <p className="host-flow-splash-lead">
               Form 2 teams of 2. Have your partner scan this QR code.
             </p>
@@ -2092,7 +2110,7 @@ function HostView({ room, shared, onResetRoom }) {
 
       {g.phase === 'final' ? (
         <div className="host-flow-overlay host-flow-overlay--final">
-          <p className="clockit-wordmark clockit-wordmark--small">ClockIt</p>
+          <ClockItLogo variant="small" />
           <div className="host-flow-final-grid">
             <div className="host-flow-final-box">
               <span className="host-flow-final-label">Team 1</span>
@@ -2371,7 +2389,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, parti
       {gm.phase === 'splash' ? (
         <div className="participant-flow-overlay participant-flow-overlay--splash">
           <div className="participant-flow-inner participant-flow-inner--splash-card">
-            <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
+            <ClockItLogo variant="phone" />
             <p className="participant-flow-wait">
               Get ready—you&apos;ll draw on this phone. When your round starts, draw as fast as you can and send as many
               creatures as you can.
@@ -2415,7 +2433,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, parti
           className="participant-flow-overlay participant-flow-overlay--splash participant-flow-overlay--results"
           aria-live="polite"
         >
-          <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
+          <ClockItLogo variant="phone" />
           <p className="participant-flow-results-title">Time&apos;s up</p>
           <p className="participant-flow-results-sub">Round complete — nice work.</p>
           <p className="participant-flow-results-score">Team 1 — {gm.team1Score} pts</p>
@@ -2427,7 +2445,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, parti
           className="participant-flow-overlay participant-flow-overlay--splash participant-flow-overlay--results"
           aria-live="polite"
         >
-          <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
+          <ClockItLogo variant="phone" />
           <p className="participant-flow-results-title">Time&apos;s up</p>
           <p className="participant-flow-results-sub">Round complete — nice work.</p>
           <p className="participant-flow-results-score">Team 2 — {gm.team2Score} pts</p>
@@ -2436,7 +2454,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, parti
 
       {gm.phase === 'final' ? (
         <div className="participant-flow-overlay participant-flow-overlay--final">
-          <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
+          <ClockItLogo variant="phone" />
           <div className="participant-flow-final-grid">
             <div className="participant-flow-final-box">
               <span>Team 1</span>

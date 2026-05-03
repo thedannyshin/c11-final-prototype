@@ -602,19 +602,20 @@ p {
   max-width: 22rem;
 }
 
-.clockit-wordmark {
-  margin: 0;
-  font-size: clamp(2.5rem, 8vw, 3.75rem);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.97);
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.65);
+/* PNG logo — width-only scaling; height: auto keeps file aspect ratio */
+.clockit-logo {
+  display: block;
+  margin: 0 auto;
+  width: clamp(11rem, 42vw, 22rem);
+  height: auto;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 28px rgba(0, 0, 0, 0.55));
 }
 
-.clockit-wordmark--small {
-  font-size: clamp(1.5rem, 4vw, 2rem);
-  margin-bottom: 0.5rem;
+.clockit-logo--small {
+  width: clamp(7rem, 28vw, 14rem);
+  margin-bottom: 0.35rem;
 }
 
 .host-flow-subtitle {
@@ -943,8 +944,8 @@ p {
   pointer-events: none;
 }
 
-.clockit-wordmark--phone {
-  font-size: clamp(1.75rem, 6vw, 2.5rem);
+.clockit-logo--phone {
+  width: clamp(8rem, 52vw, 15rem);
 }
 
 .participant-flow-wait {
