@@ -129,13 +129,15 @@ function preloadSceneBackgroundArt() {
   });
 }
 
-/** Phone splash: cycles scene art + crossfade + zoom like host AquariumCanvas splash preview. */
-function ParticipantSplashBackdrop({ active }) {
+/** Phone splash: cycles scene art + crossfade + zoom until host locks a background in Firebase. */
+function ParticipantSplashBackdrop({ active, lockedSceneId }) {
   const [idx, setIdx] = useState(0);
   const [blend, setBlend] = useState(0);
 
+  const slideshow = active && lockedSceneId == null;
+
   useEffect(() => {
-    if (!active) {
+    if (!slideshow) {
       setIdx(0);
       setBlend(0);
       return undefined;
@@ -150,14 +152,35 @@ function ParticipantSplashBackdrop({ active }) {
       }, SPLASH_CROSSFADE_MS);
     }, SPLASH_ZOOM_CYCLE_MS);
     return () => window.clearInterval(id);
-  }, [active]);
+  }, [slideshow]);
+
+  if (!active) return null;
+
+  const tf = `opacity ${SPLASH_CROSSFADE_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`;
+
+  if (lockedSceneId != null) {
+    const id = normalizeRoomBackground(lockedSceneId);
+    return (
+      <div className="participant-splash-bg" aria-hidden>
+        <div className="participant-splash-bg-zoom">
+          <div
+            className="participant-splash-bg-layer"
+            data-scene={id}
+            style={{
+              opacity: 1,
+              backgroundImage: `url('${HOST_BG_BY_SCENE[id]}')`,
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   const n = HOST_SCENE_OPTIONS.length;
   const sceneBottom = HOST_SCENE_OPTIONS[idx].id;
   const sceneTop = HOST_SCENE_OPTIONS[(idx + 1) % n].id;
   const urlBottom = HOST_BG_BY_SCENE[sceneBottom];
   const urlTop = HOST_BG_BY_SCENE[sceneTop];
-  const tf = `opacity ${SPLASH_CROSSFADE_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`;
 
   return (
     <div className="participant-splash-bg" aria-hidden>
@@ -495,9 +518,14 @@ function createTransport(roomId) {
   });
 
   const unsubSettingsBg = onValue(settingsBgRef, (snapshot) => {
+    const raw = snapshot.val();
     handle({
       type: 'room:state',
-      payload: { roomBackground: normalizeRoomBackground(snapshot.val()) },
+      payload: {
+        roomBackground: normalizeRoomBackground(raw),
+        /** False until host writes a scene — distinguishes “not chosen yet” from explicit water */
+        roomBackgroundExplicit: raw != null,
+      },
     });
   });
 
@@ -761,6 +789,7 @@ function useSharedRoom(roomId, client) {
   const [strokes, setStrokes] = useState([]);
   const [participants, setParticipants] = useState({});
   const [roomBackground, setRoomBackgroundState] = useState('water');
+  const [roomBackgroundExplicit, setRoomBackgroundExplicit] = useState(false);
   const [game, setGame] = useState(defaultGameState);
   const transportRef = useRef(null);
   const gameRef = useRef(game);
@@ -773,6 +802,7 @@ function useSharedRoom(roomId, client) {
     setStrokes([]);
     setParticipants({});
     setRoomBackgroundState('water');
+    setRoomBackgroundExplicit(false);
     setGame(defaultGameState());
 
     const transport = createTransport(roomId);
@@ -811,6 +841,9 @@ function useSharedRoom(roomId, client) {
         }
         if (message.payload.roomBackground !== undefined) {
           setRoomBackgroundState(normalizeRoomBackground(message.payload.roomBackground));
+        }
+        if (message.payload.roomBackgroundExplicit !== undefined) {
+          setRoomBackgroundExplicit(!!message.payload.roomBackgroundExplicit);
         }
         if (message.payload.game !== undefined) {
           setGame(normalizeGameState(message.payload.game));
@@ -860,6 +893,7 @@ function useSharedRoom(roomId, client) {
     strokes,
     participants,
     roomBackground,
+    roomBackgroundExplicit,
     game,
     addCharacter(character) {
       setStrokes((prev) => {
@@ -985,7 +1019,7 @@ function useSharedRoom(roomId, client) {
         payload: b,
       });
     },
-  }), [strokes, participants, roomBackground, game, client.clientId, sendCanvasClear]);
+  }), [strokes, participants, roomBackground, roomBackgroundExplicit, game, client.clientId, sendCanvasClear]);
 }
 
 
@@ -2231,7 +2265,12 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
       data-scene={scene}
       style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
     >
-      {gm.phase === 'splash' ? <ParticipantSplashBackdrop active /> : null}
+      {gm.phase === 'splash' ? (
+        <ParticipantSplashBackdrop
+          active
+          lockedSceneId={shared.roomBackgroundExplicit ? scene : null}
+        />
+      ) : null}
 
       {gm.phase === 'splash' ? (
         <div className="participant-flow-overlay participant-flow-overlay--splash">
