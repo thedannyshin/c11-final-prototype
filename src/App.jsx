@@ -7,6 +7,8 @@ const CANVAS_W = 1200;
 const CANVAS_H = 700;
 const DEFAULT_COLOR = '#00D4FF';
 const COLORS = ['#FFFFFF', '#00D4FF', '#F43F5E', '#10B981', '#FBBF24', '#A78BFA'];
+/** Semi-transparent tint over blurred scene so strokes stay readable on participant pad. */
+const PARTICIPANT_PAD_SURFACE = 'rgba(5, 14, 28, 0.62)';
 const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
 
 function mainAquariumWidthPx() {
@@ -1033,7 +1035,7 @@ function DrawingPad({ onCommit }) {
     oc.height = canvas.height;
     const ocCtx = oc.getContext('2d');
     ocCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ocCtx.fillStyle = '#0a1628';
+    ocCtx.fillStyle = PARTICIPANT_PAD_SURFACE;
     ocCtx.fillRect(0, 0, w, h);
     for (const path of submittedRef.current) {
       ocCtx.save();
@@ -1057,7 +1059,7 @@ function DrawingPad({ onCommit }) {
     canvas.height = h * dpr;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#0a1628';
+    ctx.fillStyle = PARTICIPANT_PAD_SURFACE;
     ctx.fillRect(0, 0, w, h);
     ctxRef.current = ctx;
     rebakeAndBlit();
@@ -1147,14 +1149,17 @@ function DrawingPad({ onCommit }) {
 
   return (
     <div className="pad-layout">
-      <canvas
-        ref={canvasRef}
-        className="drawing-pad"
-        onMouseDown={start}
-        onMouseMove={move}
-        onMouseUp={end}
-        onMouseLeave={end}
-      />
+      <div className="drawing-pad-frame">
+        <div className="drawing-pad-bg" aria-hidden />
+        <canvas
+          ref={canvasRef}
+          className="drawing-pad"
+          onMouseDown={start}
+          onMouseMove={move}
+          onMouseUp={end}
+          onMouseLeave={end}
+        />
+      </div>
       <div className="pad-controls">
         <div className="swatches-inline">
           {COLORS.map((swatch) => (
