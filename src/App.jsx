@@ -241,17 +241,6 @@ async function exitBrowserFullscreen() {
   else if (typeof document.webkitExitFullscreen === 'function') await document.webkitExitFullscreen();
 }
 
-function HudIconRestart() {
-  return (
-    <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 3" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 21" />
-      <path d="M3 21v-5h5" />
-    </svg>
-  );
-}
-
 function HudIconFullscreenEnter() {
   return (
     <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -308,15 +297,6 @@ function HudIconWebcam() {
     <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
       <circle cx="12" cy="13" r="3.5" />
-    </svg>
-  );
-}
-
-function HudIconReleaseAll() {
-  return (
-    <svg className="hud-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
     </svg>
   );
 }
@@ -1346,7 +1326,7 @@ function HeldCreatureOverlay({ creature, pos }) {
 // ---------------------------------------------------------------------------
 // Side aquarium — static glowing display of creatures dragged from main tank.
 // ---------------------------------------------------------------------------
-function SideAquarium({ creatures, onReleaseAll, scene = 'water' }) {
+function SideAquarium({ creatures, scene = 'water' }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -1412,17 +1392,6 @@ function SideAquarium({ creatures, onReleaseAll, scene = 'water' }) {
 
   return (
     <div className="side-panel">
-      {creatures.length > 0 && (
-        <button
-          type="button"
-          className="side-panel-release"
-          onClick={onReleaseAll}
-          aria-label="Release all creatures to main screen"
-          title="Release all"
-        >
-          <HudIconReleaseAll />
-        </button>
-      )}
       <canvas ref={canvasRef} className="side-canvas" />
     </div>
   );
@@ -2143,20 +2112,6 @@ function HostView({ room, shared, onResetRoom }) {
         </span>
       ) : null}
 
-      {showPlayHud ? (
-        <div className="host-restart-ingame">
-          <button
-            type="button"
-            className="hud-btn hud-btn--icon"
-            onClick={onResetRoom}
-            aria-label="Restart"
-            title="Restart — new room code"
-          >
-            <HudIconRestart />
-          </button>
-        </div>
-      ) : null}
-
       <div className={`host-layout${g.phase === 'splash' ? ' host-layout--splash' : ''}`}>
         <div className="aquarium-wrapper">
           <AquariumCanvas
@@ -2171,15 +2126,7 @@ function HostView({ room, shared, onResetRoom }) {
           />
         </div>
         {g.phase !== 'splash' ? (
-          <SideAquarium
-            creatures={sideCreatures}
-            scene={displayScene}
-            onReleaseAll={() => {
-              setSideCreatures([]);
-              hiddenIdsRef.current = new Set();
-              setHiddenIds(new Set());
-            }}
-          />
+          <SideAquarium creatures={sideCreatures} scene={displayScene} />
         ) : null}
       </div>
 

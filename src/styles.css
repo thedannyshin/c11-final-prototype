@@ -561,12 +561,12 @@ p {
   flex: 0 1 auto;
   padding: clamp(6px, 1.2vw, 12px) clamp(10px, 2vw, 22px);
   border-radius: 16px;
-  background: rgba(5, 14, 28, 0.55);
+  background: transparent;
   border: none;
 }
 
 .host-play-score-block.is-active {
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
 }
 
 .host-play-score-label {
@@ -584,23 +584,6 @@ p {
   line-height: 1;
   color: rgba(255, 255, 255, 0.98);
   text-shadow: 0 4px 36px rgba(0, 0, 0, 0.55);
-}
-
-/* In-game Restart only (bottom-right); above canvas, below fingertip overlays */
-.host-restart-ingame {
-  position: fixed;
-  right: 20px;
-  bottom: max(20px, env(safe-area-inset-bottom));
-  z-index: 16;
-  display: flex;
-  align-items: center;
-  padding: 8px 14px;
-  background: rgba(5, 14, 28, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  pointer-events: auto;
 }
 
 .host-play-timer {
@@ -1313,32 +1296,6 @@ p {
   -webkit-backdrop-filter: blur(20px);
   border-left: 1px solid rgba(255, 255, 255, 0.06);
   z-index: 1;
-}
-
-.side-panel-release {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: none;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.55);
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    background 0.15s;
-}
-
-.side-panel-release:hover {
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.14);
 }
 
 .side-canvas {
