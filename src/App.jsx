@@ -2346,10 +2346,26 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
 
       {inDrawRound ? (
         <>
-          <div className="participant-header">
-            <span className="participant-round-timer" aria-live="polite">
-              {gm.roundEndAt ? formatRoundClock(gm.roundEndAt) : '—'}
-            </span>
+          <div className="participant-play-hud">
+            <div className="participant-play-hud-row">
+              <p className="participant-play-team">
+                {gm.phase === 'team1' ? 'Team 1' : 'Team 2'}
+              </p>
+              <div className="participant-play-score-wrap">
+                <span className="participant-play-score-num">
+                  {gm.phase === 'team1' ? gm.team1Score : gm.team2Score}
+                </span>
+              </div>
+              {gm.roundEndAt ? (
+                <p className="participant-play-timer" aria-live="polite">
+                  {formatRoundClock(gm.roundEndAt)}
+                </p>
+              ) : (
+                <p className="participant-play-timer" aria-live="polite">
+                  —
+                </p>
+              )}
+            </div>
           </div>
           {!myTurnToDraw ? (
             <div className="participant-sitout-card">
