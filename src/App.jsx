@@ -1810,13 +1810,10 @@ function HostView({ room, shared, onResetRoom }) {
             {g.phase === 'team1' ? 'Team 1' : 'Team 2'}
           </p>
           <div className="host-play-scores">
-            <div className={`host-play-score-block${g.phase === 'team1' ? ' is-active' : ''}`}>
-              <span className="host-play-score-label">Team 1</span>
-              <span className="host-play-score-num">{g.team1Score}</span>
-            </div>
-            <div className={`host-play-score-block${g.phase === 'team2' ? ' is-active' : ''}`}>
-              <span className="host-play-score-label">Team 2</span>
-              <span className="host-play-score-num">{g.team2Score}</span>
+            <div className="host-play-score-block is-active">
+              <span className="host-play-score-num">
+                {g.phase === 'team1' ? g.team1Score : g.team2Score}
+              </span>
             </div>
           </div>
           {g.roundEndAt ? <p className="host-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
@@ -1945,7 +1942,7 @@ function HostView({ room, shared, onResetRoom }) {
         </div>
       </div>
 
-      {g.phase !== 'splash' ? (
+      {g.phase !== 'splash' && !showPlayHud ? (
         <div className="qr-corner">
           <div className="qr-label">Scan to join</div>
           <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
