@@ -1702,10 +1702,12 @@ function HostView({ room, shared, onResetRoom }) {
   const [splashBgChosen, setSplashBgChosen] = useState(false);
   /** While on splash with no background yet: play each scene’s music file to completion, then the next */
   const [splashPreSelectMusicIdx, setSplashPreSelectMusicIdx] = useState(0);
-  const [pinchHintVisible, setPinchHintVisible] = useState(false);
+  const [relocatePointsPop, setRelocatePointsPop] = useState(0);
   const [splashRotateIdx, setSplashRotateIdx] = useState(0);
   const prevPhaseForSplashRef = useRef(shared.game.phase);
   const hudIdleTimerRef = useRef(null);
+  const bumpRelocatePointsPopRef = useRef(() => {});
+  bumpRelocatePointsPopRef.current = () => setRelocatePointsPop((n) => n + 1);
 
   musicVolumeRef.current = musicVolume;
 
@@ -1886,6 +1888,7 @@ function HostView({ room, shared, onResetRoom }) {
           hiddenIdsRef.current = new Set([...hiddenIdsRef.current, id]);
           setHiddenIds(new Set(hiddenIdsRef.current));
           sharedRef.current.awardRelocatePoints();
+          bumpRelocatePointsPopRef.current();
         }
       } else if (pos) {
         // Dropped in main aquarium — teleport creature to drop position.
@@ -1987,16 +1990,6 @@ function HostView({ room, shared, onResetRoom }) {
   const cd = getCountdownDisplay(g);
   const showPlayHud = g.phase === 'team1' || g.phase === 'team2';
 
-  useEffect(() => {
-    if (!showPlayHud) {
-      setPinchHintVisible(false);
-      return undefined;
-    }
-    setPinchHintVisible(true);
-    const t = window.setTimeout(() => setPinchHintVisible(false), 2600);
-    return () => window.clearTimeout(t);
-  }, [showPlayHud, g.phase]);
-
   return (
     <div
       className={`host-fullscreen${hudIdleHidden && g.phase !== 'splash' ? ' host-fullscreen--ui-idle' : ''}${
@@ -2071,6 +2064,7 @@ function HostView({ room, shared, onResetRoom }) {
 
       {g.phase === 'results_team1' ? (
         <div className="host-flow-overlay host-flow-overlay--results">
+          <ClockItLogo />
           <p className="host-flow-results-hero">Time&apos;s Up!</p>
           <p className="host-flow-results-score">Team 1 — {g.team1Score} pts</p>
           <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
@@ -2081,6 +2075,7 @@ function HostView({ room, shared, onResetRoom }) {
 
       {g.phase === 'results_team2' ? (
         <div className="host-flow-overlay host-flow-overlay--results">
+          <ClockItLogo />
           <p className="host-flow-results-hero">Time&apos;s Up!</p>
           <p className="host-flow-results-score">Team 2 — {g.team2Score} pts</p>
           <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToFinal()}>
@@ -2103,9 +2098,19 @@ function HostView({ room, shared, onResetRoom }) {
             </div>
           </div>
           <p className="host-flow-final-winner">{getWinnerPhrase(g.team1Score, g.team2Score)}</p>
-          <button type="button" className="host-flow-play" onClick={() => shared.gameBackToSplash()}>
-            Play again
-          </button>
+          <div className="host-flow-final-actions">
+            <button type="button" className="host-flow-play" onClick={() => shared.gameBackToSplash()}>
+              Play again
+            </button>
+            <button
+              type="button"
+              className="host-flow-play host-flow-play--secondary"
+              onClick={onResetRoom}
+              title="New room code — share the new QR for a fresh game"
+            >
+              New game
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -2124,14 +2129,16 @@ function HostView({ room, shared, onResetRoom }) {
             </div>
             {g.roundEndAt ? <p className="host-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
           </div>
-          <p
-            key={`host-pinch-hint-${g.phase}`}
-            className={`host-play-hint${pinchHintVisible ? '' : ' host-play-hint--faded'}`}
-            aria-hidden={!pinchHintVisible}
-          >
+          <p key={`host-pinch-hint-${g.phase}`} className="host-play-hint">
             Pinch to grab creatures and move them to the right side.
           </p>
         </div>
+      ) : null}
+
+      {relocatePointsPop > 0 ? (
+        <span key={relocatePointsPop} className="points-pop points-pop--host" aria-hidden>
+          +{GAME_POINTS_MOVE}
+        </span>
       ) : null}
 
       {showPlayHud ? (
@@ -2296,7 +2303,7 @@ function HostView({ room, shared, onResetRoom }) {
 
 function ParticipantView({ shared, clientName, setClientName, clientColor, clientId }) {
   const [, forceClockTick] = useState(0);
-  const [drawHintVisible, setDrawHintVisible] = useState(false);
+  const [sendPointsPop, setSendPointsPop] = useState(0);
   const scene = normalizeRoomBackground(shared.roomBackground);
   const bgUrl = HOST_BG_BY_SCENE[scene] ?? HOST_BG_BY_SCENE.water;
   const gm = shared.game;
@@ -2308,6 +2315,10 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
   const myTurnToDraw =
     inDrawRound &&
     ((gm.phase === 'team1' && assignedTeam === 1) || (gm.phase === 'team2' && assignedTeam === 2));
+  const countdownActiveTeam =
+    gm.phase === 'countdown_team1' ? 1 : gm.phase === 'countdown_team2' ? 2 : null;
+  const participantCountsDown =
+    countdownActiveTeam != null && assignedTeam === countdownActiveTeam;
   const cdPhone = getCountdownDisplay(gm);
 
   useEffect(() => {
@@ -2316,16 +2327,6 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
     const id = window.setInterval(() => forceClockTick((n) => n + 1), 250);
     return () => window.clearInterval(id);
   }, [gm.phase, gm.roundEndAt]);
-
-  useEffect(() => {
-    if (!inDrawRound) {
-      setDrawHintVisible(false);
-      return undefined;
-    }
-    setDrawHintVisible(true);
-    const t = window.setTimeout(() => setDrawHintVisible(false), 2600);
-    return () => window.clearTimeout(t);
-  }, [inDrawRound, gm.phase]);
 
   return (
     <div
@@ -2356,11 +2357,23 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
       ) : null}
 
       {(gm.phase === 'countdown_team1' || gm.phase === 'countdown_team2') ? (
-        <div className="participant-flow-overlay participant-flow-overlay--countdown" aria-live="assertive">
-          <span className="participant-flow-countdown-line" key={`${gm.phase}-${gm.countdownStep ?? 0}`}>
-            {cdPhone.line1}
-          </span>
-        </div>
+        participantCountsDown ? (
+          <div className="participant-flow-overlay participant-flow-overlay--countdown" aria-live="assertive">
+            <span className="participant-flow-countdown-line" key={`${gm.phase}-${gm.countdownStep ?? 0}`}>
+              {cdPhone.line1}
+            </span>
+          </div>
+        ) : (
+          <div
+            className="participant-flow-overlay participant-flow-overlay--splash participant-flow-overlay--results"
+            aria-live="polite"
+          >
+            <ClockItLogo variant="phone" />
+            <p className="participant-flow-results-title">
+              Team {countdownActiveTeam}&apos;s turn
+            </p>
+          </div>
+        )
       ) : null}
 
       {gm.phase === 'results_team1' ? (
@@ -2370,7 +2383,6 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
         >
           <ClockItLogo variant="phone" />
           <p className="participant-flow-results-title">Time&apos;s up</p>
-          <p className="participant-flow-results-sub">Round complete — nice work.</p>
           <p className="participant-flow-results-score">Team 1 — {gm.team1Score} pts</p>
         </div>
       ) : null}
@@ -2382,7 +2394,6 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
         >
           <ClockItLogo variant="phone" />
           <p className="participant-flow-results-title">Time&apos;s up</p>
-          <p className="participant-flow-results-sub">Round complete — nice work.</p>
           <p className="participant-flow-results-score">Team 2 — {gm.team2Score} pts</p>
         </div>
       ) : null}
@@ -2421,18 +2432,22 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
             </div>
           ) : (
             <DrawingPad
-              onCommit={shared.addCharacter}
+              onCommit={(character) => {
+                shared.addCharacter(character);
+                setSendPointsPop((n) => n + 1);
+              }}
               overlay={
-                <p
-                  key={`participant-draw-hint-${gm.phase}`}
-                  className={`participant-draw-hint${drawHintVisible ? '' : ' participant-draw-hint--faded'}`}
-                  aria-hidden={!drawHintVisible}
-                >
+                <p key={`participant-draw-hint-${gm.phase}`} className="participant-draw-hint">
                   Draw as fast as you can—send as many creatures as you can before time runs out.
                 </p>
               }
             />
           )}
+          {myTurnToDraw && sendPointsPop > 0 ? (
+            <span key={sendPointsPop} className="points-pop points-pop--participant" aria-hidden>
+              +{GAME_POINTS_DRAW}
+            </span>
+          ) : null}
         </>
       ) : null}
     </div>
