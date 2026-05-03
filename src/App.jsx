@@ -2377,7 +2377,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
             <p className="participant-assigned-team" role="status" aria-live="polite">
               {assignedTeam === 1 || assignedTeam === 2 ? (
                 <>
-                  You&apos;re on <strong>Team {assignedTeam}</strong>
+                  You&apos;re in! <strong>Scan the QR code</strong> on the host screen to follow the game.
                 </>
               ) : shared.participants?.[clientId] ? (
                 <>
@@ -2505,40 +2505,44 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
 
 function HomeView({ onCreateHost, roomInput, setRoomInput, onJoinParticipant }) {
   return (
-    <div className="home-shell">
-      <div className="home-card">
-        <div className="home-copy">
-          <div className="eyebrow">Shared drawing MVP</div>
-          <h1>Phones as brushes, laptop as canvas.</h1>
-          <p>
-            Start a room on your computer, then let people join from any phone browser and draw their creature onto the shared aquarium.
-          </p>
-        </div>
+    <div
+      className="home-shell home-shell--clockit"
+      style={{ '--home-shell-bg': `url('${HOST_BG_BY_SCENE.water}')` }}
+    >
+      <div className="home-landing-card participant-flow-inner participant-flow-inner--splash-card">
+        <ClockItLogo variant="phone" />
+        <p className="home-landing-tagline">Pinch. Pick. Play.</p>
+        <p className="home-landing-intro">
+          Host on a laptop or projector. Artists join from their phones and send creatures into the shared world.
+        </p>
 
-        <div className="home-actions">
-          <section className="panel stack gap-12">
-            <div>
-              <div className="panel-title small">Start host screen</div>
-              <p className="muted-text">Use this on your laptop or projector.</p>
-            </div>
-            <button type="button" className="button full-width" onClick={onCreateHost}>
-              Create room
+        <div className="home-landing-actions">
+          <section className="home-landing-section">
+            <div className="home-landing-section-title">Host</div>
+            <p className="home-landing-section-lead">
+              Use this on the big screen. You&apos;ll get a room code and a QR code for artists.
+            </p>
+            <button type="button" className="button home-landing-btn full-width" onClick={onCreateHost}>
+              Start host
             </button>
           </section>
 
-          <section className="panel stack gap-12">
-            <div>
-              <div className="panel-title small">Join as participant</div>
-              <p className="muted-text">Paste a room code to join from a phone.</p>
-            </div>
-            <div className="row gap-8">
+          <section className="home-landing-section">
+            <div className="home-landing-section-title">Join</div>
+            <p className="home-landing-section-lead">
+              <strong>Scan the QR code</strong> on the host screen. If you can&apos;t, enter the room code below.
+            </p>
+            <div className="row gap-8 align-center wrap home-landing-join-row">
               <input
                 value={roomInput}
                 onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
-                placeholder="Enter room code"
-                className="text-input"
+                placeholder="Room code"
+                className="text-input home-landing-input"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
               />
-              <button type="button" className="button" onClick={onJoinParticipant} disabled={!roomInput.trim()}>
+              <button type="button" className="button home-landing-btn" onClick={onJoinParticipant} disabled={!roomInput.trim()}>
                 Join
               </button>
             </div>

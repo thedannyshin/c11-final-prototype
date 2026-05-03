@@ -53,54 +53,142 @@ p {
 }
 
 .home-shell {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
+  min-height: 100dvh;
+  box-sizing: border-box;
 }
 
-.home-card {
-  width: min(1100px, 100%);
-  background: #fff;
-  border-radius: 32px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  overflow: hidden;
+/* Landing — same full-bleed scene + glass card language as in-room splash */
+.home-shell--clockit {
+  --home-shell-bg: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+  isolation: isolate;
+  background-color: #020508;
+  background-image:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.76)),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0) 52%, rgba(5, 10, 22, 0.58) 100%),
+    var(--home-shell-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
-.home-copy,
-.home-actions {
-  padding: 28px;
+.home-landing-card {
+  width: 100%;
+  max-width: min(92vw, 32rem);
+  gap: 12px;
 }
 
-.home-copy {
-  border-right: 1px solid #e2e8f0;
+.home-landing-tagline {
+  margin: 0;
+  font-size: clamp(0.95rem, 3.5vw, 1.1rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  background: linear-gradient(90deg, #fff 0%, #fde047 45%, #7dd3fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
-.home-copy h1 {
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1.05;
-  margin: 10px 0 14px;
+.home-landing-intro {
+  margin: 0;
+  font-size: clamp(0.88rem, 2.8vw, 1rem);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.78);
+  max-width: 26rem;
 }
 
-.home-copy p {
-  color: #475569;
-  max-width: 36rem;
+.home-landing-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  margin-top: 8px;
 }
 
-.home-actions {
-  display: grid;
-  gap: 16px;
+.home-landing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  width: 100%;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.eyebrow {
-  display: inline-block;
-  border: 1px solid #e2e8f0;
-  color: #475569;
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 0.75rem;
+.home-landing-section:first-of-type {
+  padding-top: 10px;
+  border-top: none;
+}
+
+.home-landing-section-title {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(0, 212, 255, 0.85);
+}
+
+.home-landing-section-lead {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.home-landing-section-lead strong {
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.home-landing-join-row {
+  width: 100%;
+}
+
+.home-landing-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-shell--clockit .home-landing-btn {
+  border-radius: 14px;
+  font-weight: 800;
+  background: linear-gradient(180deg, rgba(0, 212, 255, 0.35) 0%, rgba(0, 160, 200, 0.22) 100%);
+  border: 1px solid rgba(0, 212, 255, 0.55);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.home-shell--clockit .home-landing-btn:hover:not(:disabled) {
+  border-color: rgba(0, 212, 255, 0.85);
+  background: linear-gradient(180deg, rgba(0, 212, 255, 0.45) 0%, rgba(0, 160, 200, 0.3) 100%);
+}
+
+.home-shell--clockit .home-landing-btn:disabled {
+  opacity: 0.45;
+}
+
+.home-shell--clockit .text-input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.home-shell--clockit .text-input::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.home-shell--clockit .text-input:focus {
+  outline: 2px solid rgba(0, 212, 255, 0.45);
+  outline-offset: 2px;
+  border-color: rgba(0, 212, 255, 0.5);
 }
 
 .layout-grid {
@@ -1715,13 +1803,7 @@ input[type='range'] {
 }
 
 @media (max-width: 980px) {
-  .home-card,
   .layout-grid {
     grid-template-columns: 1fr;
-  }
-
-  .home-copy {
-    border-right: 0;
-    border-bottom: 1px solid #e2e8f0;
   }
 }
