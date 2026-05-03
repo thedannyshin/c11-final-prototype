@@ -1846,7 +1846,6 @@ function HostView({ room, shared, onResetRoom }) {
         />
       </div>
 
-      {!showPlayHud ? (
       <div
         className={`host-hud${hudIdleHidden ? ' host-hud--idle-hidden' : ''}`}
         aria-hidden={hudIdleHidden}
@@ -1945,9 +1944,8 @@ function HostView({ room, shared, onResetRoom }) {
           </select>
         </div>
       </div>
-      ) : null}
 
-      {g.phase !== 'splash' && !showPlayHud ? (
+      {g.phase !== 'splash' ? (
         <div className="qr-corner">
           <div className="qr-label">Scan to join</div>
           <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
