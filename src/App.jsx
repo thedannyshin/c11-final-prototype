@@ -186,12 +186,8 @@ function ParticipantSplashBackdrop({ active, lockedSceneId }) {
   if (lockedSceneId != null) {
     const id = normalizeRoomBackground(lockedSceneId);
     return (
-      <div
-        className="participant-splash-bg"
-        aria-hidden
-        style={{ '--participant-splash-zoom-ms': `${SPLASH_ZOOM_CYCLE_MS}ms` }}
-      >
-        <div className="participant-splash-bg-zoom participant-splash-bg-zoom--idle">
+      <div className="participant-splash-bg" aria-hidden>
+        <div className="participant-splash-bg-zoom">
           <div
             className="participant-splash-bg-layer"
             data-scene={id}
@@ -212,12 +208,8 @@ function ParticipantSplashBackdrop({ active, lockedSceneId }) {
   const urlTop = HOST_BG_BY_SCENE[sceneTop];
 
   return (
-    <div
-      className="participant-splash-bg"
-      aria-hidden
-      style={{ '--participant-splash-zoom-ms': `${SPLASH_ZOOM_CYCLE_MS}ms` }}
-    >
-      <div className="participant-splash-bg-zoom" key={idx}>
+    <div className="participant-splash-bg" aria-hidden>
+      <div className="participant-splash-bg-zoom">
         <div
           className="participant-splash-bg-layer"
           data-scene={sceneBottom}
@@ -1275,7 +1267,11 @@ function AquariumCanvas({
 
           if (u >= 1) {
             committedScene = fade.to;
-            segmentStart = ts;
+            // Keep zoom continuous: without this, zoom snaps back to 1 because segmentStart
+            // would equal `ts` while the incoming layer ended the fade partly zoomed-in.
+            const elapsedInFade = Math.max(0, Math.min(SPLASH_CROSSFADE_MS, ts - fade.startTs));
+            const zoomProgress = Math.min(1, elapsedInFade / SPLASH_ZOOM_CYCLE_MS);
+            segmentStart = ts - zoomProgress * SPLASH_ZOOM_CYCLE_MS;
             fade = null;
           }
           vignetteScene = fade ? fade.to : committedScene;
