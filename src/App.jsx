@@ -107,6 +107,13 @@ const HOST_SCENE_OPTIONS = [
   { id: 'stars', label: 'Starry sky' },
 ];
 
+const GAME_HOW_TO_STEPS = [
+  `Two teams take turns. Each team has one person at the big screen (pinch-drag creatures into the right panel) and one artist on a phone.`,
+  `The host picks the big-screen background and starts the match. Team 1 gets a countdown, then two minutes; then Team 2. Drawings are cleared between teams.`,
+  `Sending a drawing earns ${GAME_POINTS_DRAW} points for the active team. Moving a creature into the right panel earns ${GAME_POINTS_MOVE} points.`,
+  'After both rounds, the host shows the final scores and winner.',
+];
+
 function normalizeRoomBackground(v) {
   if (v === 'grass' || v === 'stars' || v === 'water') return v;
   return 'water';
@@ -224,6 +231,21 @@ function drawCoverImage(ctx, img, destW, destH) {
   const iw = img.naturalWidth;
   const ih = img.naturalHeight;
   const scale = Math.max(destW / iw, destH / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  const dx = (destW - dw) / 2;
+  const dy = (destH - dh) / 2;
+  ctx.drawImage(img, dx, dy, dw, dh);
+  return true;
+}
+
+/** Cover-fit like drawCoverImage with extra zoom (>1 = Ken Burns–style push-in). */
+function drawCoverImageZoomed(ctx, img, destW, destH, zoom = 1) {
+  if (!img?.naturalWidth) return false;
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const base = Math.max(destW / iw, destH / ih);
+  const scale = base * zoom;
   const dw = iw * scale;
   const dh = ih * scale;
   const dx = (destW - dw) / 2;
@@ -920,8 +942,13 @@ function useSharedRoom(roomId, client) {
 // positionsRef — ref that this component fills each frame with [{id,x,y}]
 // teleportRef — ref set by HostView when a creature is dropped: {id, x, y}
 //               normalised; AquariumCanvas consumes it and moves the creature
-// scene      — key in HOST_BG_BY_SCENE (full-bleed art + vignette).
+// scene            — key in HOST_BG_BY_SCENE (full-bleed art + vignette).
+// splashBgEffects  — when true, crossfade + slow zoom while splash preview rotates.
 // ---------------------------------------------------------------------------
+const SPLASH_CROSSFADE_MS = 1100;
+const SPLASH_ZOOM_CYCLE_MS = 4500;
+const SPLASH_ZOOM_AMOUNT = 0.07;
+
 function AquariumCanvas({
   strokes,
   heldIdRef = null,
@@ -929,17 +956,23 @@ function AquariumCanvas({
   positionsRef = null,
   teleportRef = null,
   scene = 'water',
+  splashBgEffects = false,
 }) {
   const canvasRef = useRef(null);
   const charactersRef = useRef([]);
   const animRef = useRef(null);
   const knownIdsRef = useRef(new Set());
   const sceneRef = useRef(scene);
+  const splashFxRef = useRef(splashBgEffects);
   const bgImgBySceneRef = useRef({}); // hydrated as each Image loads
 
   useEffect(() => {
     sceneRef.current = scene;
   }, [scene]);
+
+  useEffect(() => {
+    splashFxRef.current = splashBgEffects;
+  }, [splashBgEffects]);
 
   useEffect(() => {
     Object.entries(HOST_BG_BY_SCENE).forEach(([id, src]) => {
@@ -1004,15 +1037,64 @@ function AquariumCanvas({
     const ctx = canvas.getContext('2d');
     let startTime = null;
 
+    let committedScene = sceneRef.current;
+    let fade = null; // { from, to, startTs, zoomOut }
+    let segmentStart = performance.now();
+
     const frame = (ts) => {
       if (!startTime) startTime = ts;
       const t = (ts - startTime) / 1000;
       const W = canvas.width;
       const H = canvas.height;
 
-      const scene = sceneRef.current;
-      const bgImg = bgImgBySceneRef.current[scene];
-      const drewBg = drawCoverImage(ctx, bgImg, W, H);
+      const target = sceneRef.current;
+      const splashFx = splashFxRef.current;
+
+      let drewBg = false;
+      let vignetteScene = target;
+
+      if (splashFx) {
+        if (!fade && target !== committedScene) {
+          const zNow = 1 + SPLASH_ZOOM_AMOUNT * Math.min(1, (ts - segmentStart) / SPLASH_ZOOM_CYCLE_MS);
+          fade = { from: committedScene, to: target, startTs: ts, zoomOut: zNow };
+        }
+
+        if (fade) {
+          const raw = Math.min(1, (ts - fade.startTs) / SPLASH_CROSSFADE_MS);
+          const u = raw * raw * (3 - 2 * raw);
+          const imgOut = bgImgBySceneRef.current[fade.from];
+          const imgIn = bgImgBySceneRef.current[fade.to];
+          const zoomIn = 1 + SPLASH_ZOOM_AMOUNT * Math.min(1, (ts - fade.startTs) / SPLASH_ZOOM_CYCLE_MS);
+
+          ctx.save();
+          ctx.globalAlpha = 1 - u;
+          drewBg = (imgOut && drawCoverImageZoomed(ctx, imgOut, W, H, fade.zoomOut)) || drewBg;
+          ctx.restore();
+          ctx.save();
+          ctx.globalAlpha = u;
+          drewBg = (imgIn && drawCoverImageZoomed(ctx, imgIn, W, H, zoomIn)) || drewBg;
+          ctx.restore();
+          ctx.globalAlpha = 1;
+
+          if (u >= 1) {
+            committedScene = fade.to;
+            segmentStart = ts;
+            fade = null;
+          }
+          vignetteScene = fade ? fade.to : committedScene;
+        } else {
+          const zoom = 1 + SPLASH_ZOOM_AMOUNT * Math.min(1, (ts - segmentStart) / SPLASH_ZOOM_CYCLE_MS);
+          const bgImg = bgImgBySceneRef.current[committedScene];
+          drewBg = drawCoverImageZoomed(ctx, bgImg, W, H, zoom);
+          vignetteScene = committedScene;
+        }
+      } else {
+        fade = null;
+        committedScene = target;
+        const bgImg = bgImgBySceneRef.current[target];
+        drewBg = drawCoverImage(ctx, bgImg, W, H);
+        vignetteScene = target;
+      }
 
       if (!drewBg) {
         const fall = ctx.createLinearGradient(0, 0, 0, H);
@@ -1022,7 +1104,7 @@ function AquariumCanvas({
         ctx.fillRect(0, 0, W, H);
       }
 
-      if (!(scene === 'water' && drewBg)) {
+      if (!(vignetteScene === 'water' && drewBg)) {
         const vign = ctx.createLinearGradient(0, H * 0.5, 0, H);
         vign.addColorStop(0, 'rgba(0,0,0,0)');
         vign.addColorStop(1, 'rgba(5,10,22,0.45)');
@@ -1031,7 +1113,7 @@ function AquariumCanvas({
       }
 
       // Extra water washes were for empty gradient only; skip when art is showing.
-      if (scene === 'water' && !drewBg) {
+      if (vignetteScene === 'water' && !drewBg) {
         const floor = ctx.createLinearGradient(0, H * 0.82, 0, H);
         floor.addColorStop(0, 'rgba(5, 14, 24, 0)');
         floor.addColorStop(1, 'rgba(5, 14, 24, 0.5)');
@@ -1097,7 +1179,7 @@ function AquariumCanvas({
 
     animRef.current = requestAnimationFrame(frame);
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
-  }, []);
+  }, [splashBgEffects]);
 
   return <canvas ref={canvasRef} className="aquarium-canvas" />;
 }
@@ -1769,51 +1851,58 @@ function HostView({ room, shared, onResetRoom }) {
     >
       <audio ref={audioRef} loop preload="metadata" />
 
-      <HowToPlayModal open={howToOpen} onClose={() => setHowToOpen(false)} />
+      {howToOpen ? <HowToPlayModal open onClose={() => setHowToOpen(false)} /> : null}
 
       {g.phase === 'splash' ? (
         <div className="host-flow-overlay host-flow-overlay--splash" aria-label="ClockIt start">
-          <div className="host-flow-inner host-flow-inner--splash-card">
-            <p className="clockit-wordmark">ClockIt</p>
-            <p className="host-flow-subtitle">Scan to join this room</p>
-            <QRCodeSVG value={joinUrl} size={200} bgColor="#ffffff" fgColor="#050e18" />
-            <div className="host-flow-scene">
-              <select
-                id="host-splash-scene"
-                className="host-flow-scene-select"
-                value={splashBgChosen ? normalizeRoomBackground(shared.roomBackground) : ''}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (!v) return;
-                  shared.setRoomBackground(v);
-                  setSplashBgChosen(true);
-                }}
-                aria-label="Background for the big screen"
-              >
-                <option value="" disabled>
-                  Select a Background
-                </option>
-                {HOST_SCENE_OPTIONS.map(({ id, label }) => (
-                  <option key={id} value={id}>
-                    {label}
+          <div className="host-flow-splash-split">
+            <div className="host-flow-inner host-flow-inner--splash-card">
+              <p className="clockit-wordmark">ClockIt</p>
+              <p className="host-flow-subtitle">Scan to join this room</p>
+              <QRCodeSVG value={joinUrl} size={200} bgColor="transparent" fgColor="#ffffff" />
+              <div className="host-flow-scene">
+                <select
+                  id="host-splash-scene"
+                  className="host-flow-scene-select"
+                  value={splashBgChosen ? normalizeRoomBackground(shared.roomBackground) : ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    shared.setRoomBackground(v);
+                    setSplashBgChosen(true);
+                  }}
+                  aria-label="Background for the big screen"
+                >
+                  <option value="" disabled>
+                    Select a Background
                   </option>
+                  {HOST_SCENE_OPTIONS.map(({ id, label }) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="host-flow-actions host-flow-actions--single">
+                <button
+                  type="button"
+                  className="host-flow-action-btn"
+                  disabled={!splashBgChosen}
+                  title={splashBgChosen ? undefined : 'Select a background first'}
+                  onClick={() => shared.gamePlayFromSplash()}
+                >
+                  Play
+                </button>
+              </div>
+            </div>
+            <aside className="host-flow-splash-instructions" aria-label="How to play">
+              <h3 className="host-flow-instructions-title">Instructions</h3>
+              <ol className="host-flow-instructions-list">
+                {GAME_HOW_TO_STEPS.map((text, i) => (
+                  <li key={i}>{text}</li>
                 ))}
-              </select>
-            </div>
-            <div className="host-flow-actions">
-              <button type="button" className="host-flow-action-btn" onClick={() => setHowToOpen(true)}>
-                Instructions
-              </button>
-              <button
-                type="button"
-                className="host-flow-action-btn"
-                disabled={!splashBgChosen}
-                title={splashBgChosen ? undefined : 'Select a background first'}
-                onClick={() => shared.gamePlayFromSplash()}
-              >
-                Play
-              </button>
-            </div>
+              </ol>
+            </aside>
           </div>
         </div>
       ) : null}
@@ -1898,7 +1987,7 @@ function HostView({ room, shared, onResetRoom }) {
         </div>
       ) : null}
 
-      <div className="host-layout">
+      <div className={`host-layout${g.phase === 'splash' ? ' host-layout--splash' : ''}`}>
         <div className="aquarium-wrapper">
           <AquariumCanvas
             key={room}
@@ -1908,17 +1997,20 @@ function HostView({ room, shared, onResetRoom }) {
             positionsRef={creaturePositionsRef}
             teleportRef={teleportRef}
             scene={displayScene}
+            splashBgEffects={g.phase === 'splash' && !splashBgChosen}
           />
         </div>
-        <SideAquarium
-          creatures={sideCreatures}
-          scene={displayScene}
-          onReleaseAll={() => {
-            setSideCreatures([]);
-            hiddenIdsRef.current = new Set();
-            setHiddenIds(new Set());
-          }}
-        />
+        {g.phase !== 'splash' ? (
+          <SideAquarium
+            creatures={sideCreatures}
+            scene={displayScene}
+            onReleaseAll={() => {
+              setSideCreatures([]);
+              hiddenIdsRef.current = new Set();
+              setHiddenIds(new Set());
+            }}
+          />
+        ) : null}
       </div>
 
       {g.phase === 'splash' ? (
@@ -2043,13 +2135,6 @@ function HostView({ room, shared, onResetRoom }) {
     </div>
   );
 }
-
-const GAME_HOW_TO_STEPS = [
-  `Two teams take turns. Each team has one person at the big screen (pinch-drag creatures into the right panel) and one artist on a phone.`,
-  `The host picks the big-screen background and starts the match. Team 1 gets a countdown, then two minutes; then Team 2. Drawings are cleared between teams.`,
-  `Sending a drawing earns ${GAME_POINTS_DRAW} points for the active team. Moving a creature into the right panel earns ${GAME_POINTS_MOVE} points.`,
-  'After both rounds, the host shows the final scores and winner.',
-];
 
 function HowToPlayModal({ open, onClose }) {
   const panelRef = useRef(null);
