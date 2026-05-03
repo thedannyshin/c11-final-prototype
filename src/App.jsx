@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RoundedQRCodeSVG } from './RoundedQRCode.jsx';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   getDatabase,
   ref as dbRef,
@@ -122,6 +122,9 @@ const HOST_SCENE_OPTIONS = [
   { id: 'grass', label: 'Grass' },
   { id: 'stars', label: 'Starry sky' },
 ];
+
+/** Splash QR — compact so thumbs + Play fit comfortably */
+const HOST_SPLASH_QR_SIZE = 96;
 
 /** Crossfade / zoom / rotate timing — host AquariumCanvas splash + phone splash backdrop */
 const SPLASH_CROSSFADE_MS = 1100;
@@ -1654,7 +1657,7 @@ function HostView({ room, shared, onResetRoom }) {
       return 1;
     }
   });
-  const [handEnabled, setHandEnabled] = useState(false);
+  const [handEnabled, setHandEnabled] = useState(true);
   const [cameraDeviceId, setCameraDeviceId] = useState(() => {
     try {
       return sessionStorage.getItem('hostVideoDeviceId') || '';
@@ -1667,6 +1670,8 @@ function HostView({ room, shared, onResetRoom }) {
   const musicVolumeRef = useRef(musicVolume);
   const cameraSelectRef = useRef(null);
   const hostRootRef = useRef(null);
+  const gamePhaseRef = useRef(shared.game.phase);
+  const splashInteractRef = useRef({ setMusicVolume: () => {} });
   const [hostFullscreen, setHostFullscreen] = useState(false);
   const [hudIdleHidden, setHudIdleHidden] = useState(false);
   const [splashBgChosen, setSplashBgChosen] = useState(false);
@@ -1818,7 +1823,39 @@ function HostView({ room, shared, onResetRoom }) {
   // Wire pinch callbacks once — they read from refs so no stale-closure issue.
   useEffect(() => {
     pinchCbRef.current.onStart = (pos) => {
-      if (heldIdRef.current || !pos) return;
+      if (!pos) return;
+
+      // Pinch-to-click host UI (splash card, overlays, HUD) — same coords as fingertip cursor.
+      if (!heldIdRef.current) {
+        const x = Math.round(pos.x);
+        const y = Math.round(pos.y);
+        const el = document.elementFromPoint(x, y);
+        const hit = el?.closest?.('[data-host-hand-hit]');
+        if (hit) {
+          const tag = hit.tagName?.toUpperCase?.();
+          if (tag === 'BUTTON' && !hit.disabled) {
+            hit.click();
+            return;
+          }
+          if (tag === 'INPUT' && hit.type === 'range' && !hit.disabled) {
+            const rect = hit.getBoundingClientRect();
+            const w = rect.width || 1;
+            const t = Math.max(0, Math.min(1, (pos.x - rect.left) / w));
+            const lo = Number.parseFloat(hit.min);
+            const hi = Number.parseFloat(hit.max);
+            const minV = Number.isFinite(lo) ? lo : 0;
+            const maxV = Number.isFinite(hi) ? hi : 1;
+            splashInteractRef.current.setMusicVolume?.(minV + t * (maxV - minV));
+            return;
+          }
+        }
+      }
+
+      if (heldIdRef.current) return;
+
+      const phase = gamePhaseRef.current;
+      if (phase !== 'team1' && phase !== 'team2') return;
+
       const canvasW = mainAquariumWidthPx();
       const canvasH = window.innerHeight;
       const normX = pos.x / canvasW;
@@ -1876,6 +1913,11 @@ function HostView({ room, shared, onResetRoom }) {
   }, []);
 
   const gPhase = shared.game.phase;
+  gamePhaseRef.current = gPhase;
+  splashInteractRef.current.setMusicVolume = (v) => {
+    const nv = Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
+    setMusicVolume(nv);
+  };
 
   useEffect(() => {
     if (gPhase === 'splash' && prevPhaseForSplashRef.current !== 'splash') {
@@ -1981,16 +2023,7 @@ function HostView({ room, shared, onResetRoom }) {
               <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
               <p className="host-flow-splash-lead">Artist → scan the QR below</p>
             </div>
-            <div className="host-flow-qrcode-wrap">
-              <RoundedQRCodeSVG
-                value={joinUrl}
-                size={152}
-                fgColor="#0c1528"
-                cornerRadius={0.4}
-                level="M"
-                title="Scan this QR code on your phone to join as artist"
-              />
-            </div>
+            <QRCodeSVG value={joinUrl} size={HOST_SPLASH_QR_SIZE} bgColor="transparent" fgColor="#ffffff" />
             <div className="host-flow-scene">
               <p className="host-flow-scene-heading" id="host-splash-scene-label">
                 Pick your stage
@@ -2007,6 +2040,7 @@ function HostView({ room, shared, onResetRoom }) {
                     <button
                       key={id}
                       type="button"
+                      data-host-hand-hit=""
                       className={`host-flow-scene-thumb${chosen ? ' host-flow-scene-thumb--selected' : ''}`}
                       aria-pressed={chosen}
                       onClick={() => {
@@ -2029,6 +2063,7 @@ function HostView({ room, shared, onResetRoom }) {
             <div className="host-flow-actions host-flow-actions--single">
               <button
                 type="button"
+                data-host-hand-hit=""
                 className="host-flow-action-btn"
                 disabled={!splashBgChosen}
                 title={splashBgChosen ? undefined : 'Pick a stage first'}
@@ -2059,7 +2094,7 @@ function HostView({ room, shared, onResetRoom }) {
           <ClockItLogo />
           <p className="host-flow-results-hero">Time&apos;s Up!</p>
           <p className="host-flow-results-score">Team 1 — {g.team1Score} pts</p>
-          <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
+          <button type="button" data-host-hand-hit="" className="host-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
             Continue
           </button>
         </div>
@@ -2070,7 +2105,7 @@ function HostView({ room, shared, onResetRoom }) {
           <ClockItLogo />
           <p className="host-flow-results-hero">Time&apos;s Up!</p>
           <p className="host-flow-results-score">Team 2 — {g.team2Score} pts</p>
-          <button type="button" className="host-flow-continue" onClick={() => shared.gameContinueToFinal()}>
+          <button type="button" data-host-hand-hit="" className="host-flow-continue" onClick={() => shared.gameContinueToFinal()}>
             See the Winner
           </button>
         </div>
@@ -2091,11 +2126,12 @@ function HostView({ room, shared, onResetRoom }) {
           </div>
           <p className="host-flow-final-winner">{getWinnerPhrase(g.team1Score, g.team2Score)}</p>
           <div className="host-flow-final-actions">
-            <button type="button" className="host-flow-play" onClick={() => shared.gameBackToSplash()}>
+            <button type="button" data-host-hand-hit="" className="host-flow-play" onClick={() => shared.gameBackToSplash()}>
               Play again
             </button>
             <button
               type="button"
+              data-host-hand-hit=""
               className="host-flow-play host-flow-play--secondary"
               onClick={onResetRoom}
               title="New room code — share the new QR for a fresh game"
@@ -2157,6 +2193,7 @@ function HostView({ room, shared, onResetRoom }) {
       <div className="host-hud host-hud--start-screen">
         <button
           type="button"
+          data-host-hand-hit=""
           className="hud-btn hud-btn--icon"
           onClick={toggleHostFullscreen}
           aria-label={hostFullscreen ? 'Exit full screen' : 'Full screen'}
@@ -2168,6 +2205,7 @@ function HostView({ room, shared, onResetRoom }) {
         <div className="hud-music-wrap">
           <button
             type="button"
+            data-host-hand-hit=""
             className={`hud-btn hud-btn--icon${playing ? ' hud-btn-active' : ''}`}
             onClick={toggleMusic}
             aria-label={playing ? 'Pause music' : 'Play music'}
@@ -2182,6 +2220,7 @@ function HostView({ room, shared, onResetRoom }) {
           >
             <input
               type="range"
+              data-host-hand-hit=""
               min={0}
               max={1}
               step={0.01}
@@ -2201,6 +2240,7 @@ function HostView({ room, shared, onResetRoom }) {
         <div className="hud-camera-control">
           <button
             type="button"
+            data-host-hand-hit=""
             className={`hud-btn hud-btn--icon${handEnabled ? ' hud-btn-active' : ''}`}
             onClick={() => setHandEnabled((v) => !v)}
             onContextMenu={(e) => {
