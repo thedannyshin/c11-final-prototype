@@ -478,9 +478,7 @@ p {
   letter-spacing: 0.02em;
   text-align: center;
   color: rgba(255, 255, 255, 0.92);
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.55),
-    0 2px 10px rgba(0, 0, 0, 0.28);
+  text-shadow: 0 4px 36px rgba(0, 0, 0, 0.55);
   line-height: 1.22;
   transform-origin: center center;
   animation: play-hint-full-cycle 4s cubic-bezier(0.42, 0, 0.29, 1) forwards;
@@ -505,13 +503,8 @@ p {
   z-index: 20000;
   margin: 0;
   padding: 0;
-  font-size: clamp(1.75rem, 5.5vw, 2.75rem);
-  font-weight: 900;
-  letter-spacing: 0.05em;
-  color: #fff;
-  text-shadow:
-    0 2px 0 rgba(0, 0, 0, 0.4),
-    0 0 22px rgba(100, 220, 255, 0.9);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   transform: translate3d(-50%, 0, 0);
   pointer-events: none;
   animation: points-pop-rise 0.95s ease-out forwards;
@@ -519,10 +512,20 @@ p {
 
 .points-pop--host {
   bottom: clamp(120px, 20vh, 200px);
+  font-size: clamp(2rem, 6.5vw, 4.75rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.98);
+  text-shadow: 0 4px 36px rgba(0, 0, 0, 0.55);
 }
 
 .points-pop--participant {
   bottom: clamp(88px, 16vh, 160px);
+  font-size: clamp(1.35rem, 5.5vw, 2rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
 }
 
 .host-play-active {
@@ -827,7 +830,6 @@ p {
   font-weight: 900;
   letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.96);
-  text-shadow: 0 4px 32px rgba(0, 0, 0, 0.75);
   animation: host-countdown-pop 0.35s ease-out;
 }
 
@@ -1031,7 +1033,6 @@ p {
   font-size: clamp(2.5rem, 12vw, 5rem);
   font-weight: 900;
   color: rgba(255, 255, 255, 0.95);
-  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.75);
   transform-origin: center center;
   animation: host-countdown-pop 0.35s ease-out;
 }
@@ -1515,9 +1516,7 @@ p {
   line-height: 1.3;
   text-align: center;
   color: rgba(255, 255, 255, 0.92);
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.55),
-    0 2px 10px rgba(0, 0, 0, 0.28);
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
   flex-shrink: 0;
   transform-origin: center center;
   animation: play-hint-full-cycle 4s cubic-bezier(0.42, 0, 0.29, 1) forwards;
