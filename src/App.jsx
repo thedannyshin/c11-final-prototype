@@ -2377,7 +2377,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
             <p className="participant-assigned-team" role="status" aria-live="polite">
               {assignedTeam === 1 || assignedTeam === 2 ? (
                 <>
-                  You&apos;re in! <strong>Scan the QR code</strong> on the host screen to follow the game.
+                  You&apos;re on <strong>Team {assignedTeam}</strong>
                 </>
               ) : shared.participants?.[clientId] ? (
                 <>
@@ -2503,50 +2503,21 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
   );
 }
 
-function HomeView({ onCreateHost, roomInput, setRoomInput, onJoinParticipant }) {
+/** Shown when there is no room in the URL (typical phone open). Match participant splash; join only via QR link. */
+function JoinLandingView() {
   return (
     <div
-      className="home-shell home-shell--clockit"
-      style={{ '--home-shell-bg': `url('${HOST_BG_BY_SCENE.water}')` }}
+      className="participant-shell participant-shell--splash-mode"
+      data-scene="water"
+      style={{ '--participant-shell-bg': `url('${HOST_BG_BY_SCENE.water}')` }}
     >
-      <div className="home-landing-card participant-flow-inner participant-flow-inner--splash-card">
-        <ClockItLogo variant="phone" />
-        <p className="home-landing-tagline">Pinch. Pick. Play.</p>
-        <p className="home-landing-intro">
-          Host on a laptop or projector. Artists join from their phones and send creatures into the shared world.
-        </p>
-
-        <div className="home-landing-actions">
-          <section className="home-landing-section">
-            <div className="home-landing-section-title">Host</div>
-            <p className="home-landing-section-lead">
-              Use this on the big screen. You&apos;ll get a room code and a QR code for artists.
-            </p>
-            <button type="button" className="button home-landing-btn full-width" onClick={onCreateHost}>
-              Start host
-            </button>
-          </section>
-
-          <section className="home-landing-section">
-            <div className="home-landing-section-title">Join</div>
-            <p className="home-landing-section-lead">
-              <strong>Scan the QR code</strong> on the host screen. If you can&apos;t, enter the room code below.
-            </p>
-            <div className="row gap-8 align-center wrap home-landing-join-row">
-              <input
-                value={roomInput}
-                onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
-                placeholder="Room code"
-                className="text-input home-landing-input"
-                autoCapitalize="characters"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-              <button type="button" className="button home-landing-btn" onClick={onJoinParticipant} disabled={!roomInput.trim()}>
-                Join
-              </button>
-            </div>
-          </section>
+      <ParticipantSplashBackdrop active lockedSceneId={null} />
+      <div className="participant-flow-overlay participant-flow-overlay--splash">
+        <div className="participant-flow-inner participant-flow-inner--splash-card">
+          <ClockItLogo variant="phone" />
+          <p className="participant-assigned-team" role="status">
+            Scan the QR code on the host screen to join.
+          </p>
         </div>
       </div>
     </div>
@@ -2579,23 +2550,7 @@ export default function App() {
   });
 
   if (!room || !mode) {
-    return (
-      <HomeView
-        roomInput={roomInput}
-        setRoomInput={setRoomInput}
-        onCreateHost={() => {
-          const next = makeId();
-          setRoom(next);
-          setRoomInput(next);
-          setMode('host');
-        }}
-        onJoinParticipant={() => {
-          if (!roomInput.trim()) return;
-          setRoom(roomInput.trim());
-          setMode('participant');
-        }}
-      />
-    );
+    return <JoinLandingView />;
   }
 
   if (mode === 'host') {
