@@ -305,6 +305,12 @@ p {
   cursor: none;
 }
 
+/* Stop aquarium / side panel from showing through the semi-transparent splash overlay */
+.host-fullscreen--splash .host-layout {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .host-game-bar {
   position: fixed;
   top: 10px;
@@ -496,6 +502,23 @@ p {
   color: rgba(255, 255, 255, 0.98);
 }
 
+/* In-game Restart only (bottom-right); above canvas, below fingertip overlays */
+.host-restart-ingame {
+  position: fixed;
+  right: 20px;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 16;
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  background: rgba(5, 14, 28, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  pointer-events: auto;
+}
+
 .host-play-timer {
   margin: 0;
   flex: 0 0 auto;
@@ -521,6 +544,10 @@ p {
   background: rgba(2, 5, 10, 0.92);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+.host-flow-overlay--splash {
+  background: rgb(5, 14, 28);
 }
 
 .host-flow-inner {
@@ -560,6 +587,51 @@ p {
   letter-spacing: 0.2em;
   font-variant-numeric: tabular-nums;
   color: rgba(255, 255, 255, 0.95);
+}
+
+.host-flow-scene {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.host-flow-scene-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: left;
+}
+
+.host-flow-scene-select {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.96);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 12px 14px;
+  cursor: pointer;
+  min-height: 48px;
+  box-sizing: border-box;
+}
+
+.host-flow-scene-select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.host-flow-scene-select option {
+  background: #0f172a;
+  color: #f1f5f9;
 }
 
 .host-flow-play {
@@ -1169,6 +1241,7 @@ p {
 .participant-header {
   display: flex;
   align-items: stretch;
+  justify-content: space-between;
   gap: 10px;
   flex-shrink: 0;
 }
@@ -1307,79 +1380,20 @@ p {
   color: rgba(255, 255, 255, 0.75);
 }
 
-.participant-scene-wrap {
-  position: relative;
+.participant-round-timer {
   flex: 1;
   min-width: 0;
-}
-
-.participant-scene-wrap::before {
-  content: '';
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.12);
-  pointer-events: none;
-  box-sizing: border-box;
-}
-
-.participant-scene-wrap::after {
-  content: '';
-  position: absolute;
-  right: 19px;
-  top: 50%;
-  transform: translateY(-40%);
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 6px solid rgba(255,255,255,0.72);
-  pointer-events: none;
-}
-
-.participant-room-code {
-  flex-shrink: 0;
   align-self: center;
   margin: 0;
   padding: 0;
-  font-size: 0.9375rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-size: clamp(1.35rem, 5.5vw, 2rem);
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.88);
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.96);
+  text-align: center;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
-}
-
-.participant-scene-select {
-  width: 100%;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: transparent;
-  color: rgba(255,255,255,0.9);
-  font: inherit;
-  font-size: 0.875rem;
-  padding: 10px 46px 10px 12px;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  min-height: 44px;
-  box-sizing: border-box;
-}
-
-.participant-scene-select:focus {
-  outline: none;
-  border-color: rgba(255, 255, 255, 0.45);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
-}
-
-.participant-scene-select option {
-  background: #0f172a;
-  color: #f1f5f9;
 }
 
 .pad-layout {

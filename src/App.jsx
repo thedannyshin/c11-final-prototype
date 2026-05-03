@@ -1736,7 +1736,9 @@ function HostView({ room, shared, onResetRoom }) {
 
   return (
     <div
-      className={`host-fullscreen${hudIdleHidden && g.phase !== 'splash' ? ' host-fullscreen--ui-idle' : ''}`}
+      className={`host-fullscreen${hudIdleHidden && g.phase !== 'splash' ? ' host-fullscreen--ui-idle' : ''}${
+        g.phase === 'splash' ? ' host-fullscreen--splash' : ''
+      }`}
       ref={hostRootRef}
     >
       <audio ref={audioRef} loop preload="metadata" />
@@ -1748,6 +1750,24 @@ function HostView({ room, shared, onResetRoom }) {
             <p className="host-flow-subtitle">Scan to join this room</p>
             <QRCodeSVG value={joinUrl} size={200} bgColor="#ffffff" fgColor="#050e18" />
             <p className="host-flow-room">{room}</p>
+            <div className="host-flow-scene">
+              <label htmlFor="host-splash-scene" className="host-flow-scene-label">
+                Big screen background
+              </label>
+              <select
+                id="host-splash-scene"
+                className="host-flow-scene-select"
+                value={shared.roomBackground}
+                onChange={(e) => shared.setRoomBackground(e.target.value)}
+                aria-label="Big screen background"
+              >
+                {HOST_SCENE_OPTIONS.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button type="button" className="host-flow-play" onClick={() => shared.gamePlayFromSplash()}>
               Play
             </button>
@@ -1818,6 +1838,20 @@ function HostView({ room, shared, onResetRoom }) {
             </div>
           </div>
           {g.roundEndAt ? <p className="host-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
+        </div>
+      ) : null}
+
+      {showPlayHud ? (
+        <div className="host-restart-ingame">
+          <button
+            type="button"
+            className="hud-btn hud-btn--icon"
+            onClick={onResetRoom}
+            aria-label="Restart"
+            title="Restart — new room code"
+          >
+            <HudIconRestart />
+          </button>
         </div>
       ) : null}
 
@@ -1964,7 +1998,7 @@ function HostView({ room, shared, onResetRoom }) {
 
 const PARTICIPANT_HOW_TO_STEPS = [
   `Two teams take turns. Each team has one person at the big screen (pinch-drag creatures into the right panel) and one artist on a phone.`,
-  `The host starts the match from the big screen. Team 1 gets a countdown, then two minutes; then Team 2. Drawings are cleared between teams.`,
+  `The host picks the big-screen background and starts the match. Team 1 gets a countdown, then two minutes; then Team 2. Drawings are cleared between teams.`,
   `Sending a drawing earns ${GAME_POINTS_DRAW} points for the active team. Moving a creature into the right panel earns ${GAME_POINTS_MOVE} points.`,
   'After both rounds, the host shows the final scores and winner.',
 ];
@@ -2025,13 +2059,21 @@ function ParticipantHowToModal({ open, onClose }) {
   );
 }
 
-function ParticipantView({ room, shared, clientName, setClientName, clientColor }) {
+function ParticipantView({ shared, clientName, setClientName, clientColor }) {
   const [howToOpen, setHowToOpen] = useState(false);
+  const [, forceClockTick] = useState(0);
   const scene = normalizeRoomBackground(shared.roomBackground);
   const bgUrl = HOST_BG_BY_SCENE[scene] ?? HOST_BG_BY_SCENE.water;
   const gm = shared.game;
   const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
   const cdPhone = getCountdownDisplay(gm);
+
+  useEffect(() => {
+    if (gm.phase !== 'team1' && gm.phase !== 'team2') return undefined;
+    if (!gm.roundEndAt) return undefined;
+    const id = window.setInterval(() => forceClockTick((n) => n + 1), 250);
+    return () => window.clearInterval(id);
+  }, [gm.phase, gm.roundEndAt]);
 
   return (
     <div
@@ -2099,22 +2141,9 @@ function ParticipantView({ room, shared, clientName, setClientName, clientColor 
       {inDrawRound ? (
         <>
           <div className="participant-header">
-            <span className="participant-room-code">{room}</span>
-            <div className="participant-scene-wrap">
-              <select
-                className="participant-scene-select"
-                value={shared.roomBackground}
-                onChange={(e) => shared.setRoomBackground(e.target.value)}
-                aria-label="Big screen background"
-                title="Change the big screen background"
-              >
-                {HOST_SCENE_OPTIONS.map(({ id, label }) => (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <span className="participant-round-timer" aria-live="polite">
+              {gm.roundEndAt ? formatRoundClock(gm.roundEndAt) : '—'}
+            </span>
             <button
               type="button"
               className="participant-howto-trigger"
@@ -2240,7 +2269,6 @@ export default function App() {
 
   return (
     <ParticipantView
-      room={room}
       shared={shared}
       clientName={clientName}
       setClientName={setClientName}
