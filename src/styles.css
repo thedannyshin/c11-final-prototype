@@ -906,7 +906,7 @@ p {
   color: rgba(255, 255, 255, 0.96);
 }
 
-/* Full-screen flows: no extra scrim — shell background + vignette stay consistent across splash, countdown, results, final. */
+/* Match host full-screen scrim (.host-flow-overlay); splash start screen overrides below. */
 .participant-flow-overlay {
   position: fixed;
   inset: 0;
@@ -917,14 +917,17 @@ p {
   justify-content: center;
   padding: 24px;
   text-align: center;
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: rgba(2, 5, 10, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   pointer-events: none;
 }
 
 .participant-flow-overlay--splash {
   gap: 16px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .participant-flow-inner--splash-card {

@@ -2293,10 +2293,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
             </span>
           </div>
         ) : (
-          <div
-            className="participant-flow-overlay participant-flow-overlay--splash participant-flow-overlay--results"
-            aria-live="polite"
-          >
+          <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
             <ClockItLogo variant="phone" />
             <p className="participant-flow-results-title">
               Team {countdownActiveTeam}&apos;s turn
@@ -2306,10 +2303,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
       ) : null}
 
       {gm.phase === 'results_team1' ? (
-        <div
-          className="participant-flow-overlay participant-flow-overlay--splash participant-flow-overlay--results"
-          aria-live="polite"
-        >
+        <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
           <ClockItLogo variant="phone" />
           <p className="participant-flow-results-title">Time&apos;s up</p>
           <p className="participant-flow-results-score">Team 1 — {gm.team1Score} pts</p>
@@ -2317,10 +2311,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
       ) : null}
 
       {gm.phase === 'results_team2' ? (
-        <div
-          className="participant-flow-overlay participant-flow-overlay--splash participant-flow-overlay--results"
-          aria-live="polite"
-        >
+        <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
           <ClockItLogo variant="phone" />
           <p className="participant-flow-results-title">Time&apos;s up</p>
           <p className="participant-flow-results-score">Team 2 — {gm.team2Score} pts</p>
@@ -2368,10 +2359,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
             </div>
           </div>
           {!myTurnToDraw ? (
-            <div
-              className="participant-flow-overlay participant-flow-overlay--splash participant-flow-overlay--results"
-              aria-live="polite"
-            >
+            <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
               <ClockItLogo variant="phone" />
               <p className="participant-flow-results-title">
                 Team {gm.phase === 'team1' ? 1 : 2}&apos;s turn
