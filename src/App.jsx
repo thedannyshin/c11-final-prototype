@@ -123,9 +123,6 @@ const HOST_SCENE_OPTIONS = [
   { id: 'stars', label: 'Starry sky' },
 ];
 
-/** Splash QR — compact so thumbs + Play fit comfortably */
-const HOST_SPLASH_QR_SIZE = 96;
-
 /** Crossfade / zoom / rotate timing — host AquariumCanvas splash + phone splash backdrop */
 const SPLASH_CROSSFADE_MS = 1100;
 const SPLASH_ZOOM_CYCLE_MS = 4500;
@@ -608,6 +605,17 @@ function loadMediaPipeHands() {
     document.head.appendChild(s);
   });
   return _mpHandsPromise;
+}
+
+/** Resolve host pinch targets under the fingertip (`data-host-gesture` on interactive nodes). */
+function hostGestureHitFromPoint(clientX, clientY) {
+  let el = document.elementFromPoint(clientX, clientY);
+  while (el && el !== document.body) {
+    const g = el.getAttribute?.('data-host-gesture');
+    if (g) return { el, gesture: g };
+    el = el.parentElement;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1591,9 +1599,13 @@ function DrawingPad({ onCommit, overlay = null }) {
 function HostView({ room, shared, onResetRoom }) {
   const joinUrl = getJoinUrl(room);
   const sharedRef = useRef(shared);
+  const onResetRoomRef = useRef(onResetRoom);
   useEffect(() => {
     sharedRef.current = shared;
   }, [shared]);
+  useEffect(() => {
+    onResetRoomRef.current = onResetRoom;
+  }, [onResetRoom]);
 
   const [, forceClockTick] = useState(0);
   useEffect(() => {
@@ -1670,8 +1682,6 @@ function HostView({ room, shared, onResetRoom }) {
   const musicVolumeRef = useRef(musicVolume);
   const cameraSelectRef = useRef(null);
   const hostRootRef = useRef(null);
-  const gamePhaseRef = useRef(shared.game.phase);
-  const splashInteractRef = useRef({ setMusicVolume: () => {} });
   const [hostFullscreen, setHostFullscreen] = useState(false);
   const [hudIdleHidden, setHudIdleHidden] = useState(false);
   const [splashBgChosen, setSplashBgChosen] = useState(false);
@@ -1820,104 +1830,7 @@ function HostView({ room, shared, onResetRoom }) {
     };
   }, [fingertipPos]);
 
-  // Wire pinch callbacks once — they read from refs so no stale-closure issue.
-  useEffect(() => {
-    pinchCbRef.current.onStart = (pos) => {
-      if (!pos) return;
-
-      // Pinch-to-click host UI (splash card, overlays, HUD) — same coords as fingertip cursor.
-      if (!heldIdRef.current) {
-        const x = Math.round(pos.x);
-        const y = Math.round(pos.y);
-        const el = document.elementFromPoint(x, y);
-        const hit = el?.closest?.('[data-host-hand-hit]');
-        if (hit) {
-          const tag = hit.tagName?.toUpperCase?.();
-          if (tag === 'BUTTON' && !hit.disabled) {
-            hit.click();
-            return;
-          }
-          if (tag === 'INPUT' && hit.type === 'range' && !hit.disabled) {
-            const rect = hit.getBoundingClientRect();
-            const w = rect.width || 1;
-            const t = Math.max(0, Math.min(1, (pos.x - rect.left) / w));
-            const lo = Number.parseFloat(hit.min);
-            const hi = Number.parseFloat(hit.max);
-            const minV = Number.isFinite(lo) ? lo : 0;
-            const maxV = Number.isFinite(hi) ? hi : 1;
-            splashInteractRef.current.setMusicVolume?.(minV + t * (maxV - minV));
-            return;
-          }
-        }
-      }
-
-      if (heldIdRef.current) return;
-
-      const phase = gamePhaseRef.current;
-      if (phase !== 'team1' && phase !== 'team2') return;
-
-      const canvasW = mainAquariumWidthPx();
-      const canvasH = window.innerHeight;
-      const normX = pos.x / canvasW;
-      const normY = pos.y / canvasH;
-      const threshold = Math.min(canvasW, canvasH) * 0.15;
-
-      let nearest = null;
-      let nearestDist = Infinity;
-      for (const c of creaturePositionsRef.current) {
-        if (hiddenIdsRef.current.has(c.id)) continue;
-        const dx = (c.x - normX) * canvasW;
-        const dy = (c.y - normY) * canvasH;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < nearestDist) { nearest = c; nearestDist = dist; }
-      }
-      if (nearest && nearestDist < threshold) {
-        const creature = sharedStrokesRef.current.find((s) => s.id === nearest.id);
-        heldIdRef.current = nearest.id;
-        heldPosRef.current = { x: normX, y: normY };
-        setHeldCreature(creature || null);
-      }
-    };
-
-    pinchCbRef.current.onEnd = (pos) => {
-      const id = heldIdRef.current;
-      if (!id) return;
-      const canvasW = mainAquariumWidthPx();
-
-      if (pos && pos.x > canvasW) {
-        // Dropped in side panel — store drop position relative to panel left edge.
-        const creature = sharedStrokesRef.current.find((s) => s.id === id);
-        if (creature) {
-          setSideCreatures((prev) => [
-            ...prev.filter((c) => c.id !== id),
-            { ...creature, dropX: pos.x - canvasW, dropY: pos.y },
-          ]);
-          hiddenIdsRef.current = new Set([...hiddenIdsRef.current, id]);
-          setHiddenIds(new Set(hiddenIdsRef.current));
-          sharedRef.current.awardRelocatePoints();
-          bumpRelocatePointsPopRef.current();
-        }
-      } else if (pos) {
-        // Dropped in main aquarium — teleport creature to drop position.
-        teleportRef.current = {
-          id,
-          x: Math.max(0.04, Math.min(0.96, pos.x / canvasW)),
-          y: Math.max(0.10, Math.min(0.88, pos.y / window.innerHeight)),
-        };
-      }
-
-      heldIdRef.current = null;
-      heldPosRef.current = null;
-      setHeldCreature(null);
-    };
-  }, []);
-
   const gPhase = shared.game.phase;
-  gamePhaseRef.current = gPhase;
-  splashInteractRef.current.setMusicVolume = (v) => {
-    const nv = Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
-    setMusicVolume(nv);
-  };
 
   useEffect(() => {
     if (gPhase === 'splash' && prevPhaseForSplashRef.current !== 'splash') {
@@ -1996,6 +1909,131 @@ function HostView({ room, shared, onResetRoom }) {
     }
   }, []);
 
+  const hostPinchUiRef = useRef({});
+  hostPinchUiRef.current = {
+    splashBgChosen,
+    setSplashBgChosen,
+    setPlaying,
+    setHandEnabled,
+    toggleMusic,
+    toggleHostFullscreen,
+  };
+
+  useEffect(() => {
+    pinchCbRef.current.onStart = (pos) => {
+      if (!pos) return;
+      const phase = sharedRef.current.game.phase;
+      const hit = hostGestureHitFromPoint(pos.x, pos.y);
+
+      if (phase === 'splash' && hit) {
+        if (hit.gesture === 'splash-stage') {
+          const sid = hit.el.getAttribute('data-stage-id');
+          if (sid && normalizeRoomBackground(sid) === sid) {
+            sharedRef.current.setRoomBackground(sid);
+            hostPinchUiRef.current.setSplashBgChosen(true);
+            hostPinchUiRef.current.setPlaying(true);
+          }
+          return;
+        }
+        if (hit.gesture === 'splash-play') {
+          if (!hostPinchUiRef.current.splashBgChosen) return;
+          hostPinchUiRef.current.setHandEnabled(true);
+          sharedRef.current.gamePlayFromSplash();
+          return;
+        }
+        if (hit.gesture === 'hud-fullscreen') {
+          void hostPinchUiRef.current.toggleHostFullscreen();
+          return;
+        }
+        if (hit.gesture === 'hud-music') {
+          hostPinchUiRef.current.toggleMusic();
+          return;
+        }
+        if (hit.gesture === 'hud-webcam') {
+          hostPinchUiRef.current.setHandEnabled((v) => !v);
+          return;
+        }
+      }
+
+      if (phase === 'final' && hit) {
+        if (hit.gesture === 'final-play-again') {
+          sharedRef.current.gameBackToSplash();
+          return;
+        }
+        if (hit.gesture === 'final-new-game') {
+          onResetRoomRef.current?.();
+          return;
+        }
+      }
+
+      if (phase === 'results_team1' && hit?.gesture === 'results-continue') {
+        sharedRef.current.gameContinueToTeam2();
+        return;
+      }
+      if (phase === 'results_team2' && hit?.gesture === 'results-continue') {
+        sharedRef.current.gameContinueToFinal();
+        return;
+      }
+
+      if (heldIdRef.current) return;
+
+      const canvasW = mainAquariumWidthPx();
+      const canvasH = window.innerHeight;
+      const normX = pos.x / canvasW;
+      const normY = pos.y / canvasH;
+      const threshold = Math.min(canvasW, canvasH) * 0.15;
+
+      let nearest = null;
+      let nearestDist = Infinity;
+      for (const c of creaturePositionsRef.current) {
+        if (hiddenIdsRef.current.has(c.id)) continue;
+        const dx = (c.x - normX) * canvasW;
+        const dy = (c.y - normY) * canvasH;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < nearestDist) {
+          nearest = c;
+          nearestDist = dist;
+        }
+      }
+      if (nearest && nearestDist < threshold) {
+        const creature = sharedStrokesRef.current.find((s) => s.id === nearest.id);
+        heldIdRef.current = nearest.id;
+        heldPosRef.current = { x: normX, y: normY };
+        setHeldCreature(creature || null);
+      }
+    };
+
+    pinchCbRef.current.onEnd = (pos) => {
+      const id = heldIdRef.current;
+      if (!id) return;
+      const canvasW = mainAquariumWidthPx();
+
+      if (pos && pos.x > canvasW) {
+        const creature = sharedStrokesRef.current.find((s) => s.id === id);
+        if (creature) {
+          setSideCreatures((prev) => [
+            ...prev.filter((c) => c.id !== id),
+            { ...creature, dropX: pos.x - canvasW, dropY: pos.y },
+          ]);
+          hiddenIdsRef.current = new Set([...hiddenIdsRef.current, id]);
+          setHiddenIds(new Set(hiddenIdsRef.current));
+          sharedRef.current.awardRelocatePoints();
+          bumpRelocatePointsPopRef.current();
+        }
+      } else if (pos) {
+        teleportRef.current = {
+          id,
+          x: Math.max(0.04, Math.min(0.96, pos.x / canvasW)),
+          y: Math.max(0.10, Math.min(0.88, pos.y / window.innerHeight)),
+        };
+      }
+
+      heldIdRef.current = null;
+      heldPosRef.current = null;
+      setHeldCreature(null);
+    };
+  }, []);
+
   const visibleStrokes = shared.strokes.filter((s) => !hiddenIds.has(s.id));
 
   const g = shared.game;
@@ -2021,9 +2059,10 @@ function HostView({ room, shared, onResetRoom }) {
             <div className="host-flow-splash-copy">
               <p className="host-flow-splash-lead host-flow-splash-lead--head">2 teams · 2 players each</p>
               <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
+              <p className="host-flow-splash-lead">Pinch where the glow sits — stages, Play, top bar</p>
               <p className="host-flow-splash-lead">Artist → scan the QR below</p>
             </div>
-            <QRCodeSVG value={joinUrl} size={HOST_SPLASH_QR_SIZE} bgColor="transparent" fgColor="#ffffff" />
+            <QRCodeSVG value={joinUrl} size={96} bgColor="transparent" fgColor="#ffffff" />
             <div className="host-flow-scene">
               <p className="host-flow-scene-heading" id="host-splash-scene-label">
                 Pick your stage
@@ -2040,9 +2079,10 @@ function HostView({ room, shared, onResetRoom }) {
                     <button
                       key={id}
                       type="button"
-                      data-host-hand-hit=""
                       className={`host-flow-scene-thumb${chosen ? ' host-flow-scene-thumb--selected' : ''}`}
                       aria-pressed={chosen}
+                      data-host-gesture="splash-stage"
+                      data-stage-id={id}
                       onClick={() => {
                         shared.setRoomBackground(id);
                         setSplashBgChosen(true);
@@ -2063,10 +2103,10 @@ function HostView({ room, shared, onResetRoom }) {
             <div className="host-flow-actions host-flow-actions--single">
               <button
                 type="button"
-                data-host-hand-hit=""
                 className="host-flow-action-btn"
                 disabled={!splashBgChosen}
                 title={splashBgChosen ? undefined : 'Pick a stage first'}
+                data-host-gesture="splash-play"
                 onClick={() => {
                   setHandEnabled(true);
                   shared.gamePlayFromSplash();
@@ -2094,7 +2134,12 @@ function HostView({ room, shared, onResetRoom }) {
           <ClockItLogo />
           <p className="host-flow-results-hero">Time&apos;s Up!</p>
           <p className="host-flow-results-score">Team 1 — {g.team1Score} pts</p>
-          <button type="button" data-host-hand-hit="" className="host-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
+          <button
+            type="button"
+            className="host-flow-continue"
+            data-host-gesture="results-continue"
+            onClick={() => shared.gameContinueToTeam2()}
+          >
             Continue
           </button>
         </div>
@@ -2105,7 +2150,12 @@ function HostView({ room, shared, onResetRoom }) {
           <ClockItLogo />
           <p className="host-flow-results-hero">Time&apos;s Up!</p>
           <p className="host-flow-results-score">Team 2 — {g.team2Score} pts</p>
-          <button type="button" data-host-hand-hit="" className="host-flow-continue" onClick={() => shared.gameContinueToFinal()}>
+          <button
+            type="button"
+            className="host-flow-continue"
+            data-host-gesture="results-continue"
+            onClick={() => shared.gameContinueToFinal()}
+          >
             See the Winner
           </button>
         </div>
@@ -2126,13 +2176,18 @@ function HostView({ room, shared, onResetRoom }) {
           </div>
           <p className="host-flow-final-winner">{getWinnerPhrase(g.team1Score, g.team2Score)}</p>
           <div className="host-flow-final-actions">
-            <button type="button" data-host-hand-hit="" className="host-flow-play" onClick={() => shared.gameBackToSplash()}>
+            <button
+              type="button"
+              className="host-flow-play"
+              data-host-gesture="final-play-again"
+              onClick={() => shared.gameBackToSplash()}
+            >
               Play again
             </button>
             <button
               type="button"
-              data-host-hand-hit=""
               className="host-flow-play host-flow-play--secondary"
+              data-host-gesture="final-new-game"
               onClick={onResetRoom}
               title="New room code — share the new QR for a fresh game"
             >
@@ -2193,8 +2248,8 @@ function HostView({ room, shared, onResetRoom }) {
       <div className="host-hud host-hud--start-screen">
         <button
           type="button"
-          data-host-hand-hit=""
           className="hud-btn hud-btn--icon"
+          data-host-gesture="hud-fullscreen"
           onClick={toggleHostFullscreen}
           aria-label={hostFullscreen ? 'Exit full screen' : 'Full screen'}
           title={hostFullscreen ? 'Exit full screen' : 'Full screen'}
@@ -2205,8 +2260,8 @@ function HostView({ room, shared, onResetRoom }) {
         <div className="hud-music-wrap">
           <button
             type="button"
-            data-host-hand-hit=""
             className={`hud-btn hud-btn--icon${playing ? ' hud-btn-active' : ''}`}
+            data-host-gesture="hud-music"
             onClick={toggleMusic}
             aria-label={playing ? 'Pause music' : 'Play music'}
             title={playing ? 'Pause music' : 'Play music'}
@@ -2220,7 +2275,6 @@ function HostView({ room, shared, onResetRoom }) {
           >
             <input
               type="range"
-              data-host-hand-hit=""
               min={0}
               max={1}
               step={0.01}
@@ -2240,8 +2294,8 @@ function HostView({ room, shared, onResetRoom }) {
         <div className="hud-camera-control">
           <button
             type="button"
-            data-host-hand-hit=""
             className={`hud-btn hud-btn--icon${handEnabled ? ' hud-btn-active' : ''}`}
+            data-host-gesture="hud-webcam"
             onClick={() => setHandEnabled((v) => !v)}
             onContextMenu={(e) => {
               e.preventDefault();
