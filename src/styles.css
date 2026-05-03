@@ -826,16 +826,19 @@ p {
 .participant-splash-bg-zoom {
   position: absolute;
   inset: -10%;
-  animation: participant-splash-bg-zoom 4.5s ease-in-out infinite alternate;
+  /* Longer than slide crossfade tick so zoom reverse doesn’t line up with every opacity blend. */
+  animation: participant-splash-bg-zoom 7.5s ease-in-out infinite alternate;
+  isolation: isolate;
+  backface-visibility: hidden;
 }
 
 @keyframes participant-splash-bg-zoom {
   from {
-    transform: scale(1);
+    transform: translateZ(0) scale(1);
   }
 
   to {
-    transform: scale(1.07);
+    transform: translateZ(0) scale(1.07);
   }
 }
 
@@ -845,6 +848,8 @@ p {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .participant-splash-bg-layer[data-scene='grass']::after,

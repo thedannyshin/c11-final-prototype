@@ -194,20 +194,30 @@ function preloadSceneBackgroundArt() {
 function ParticipantSplashBackdrop({ active }) {
   const [idx, setIdx] = useState(0);
   const [blend, setBlend] = useState(0);
+  /** When false, opacity snaps without transition so the “next” image doesn’t flash in while fading out. */
+  const [opacityTransition, setOpacityTransition] = useState(true);
 
   useEffect(() => {
     if (!active) {
       setIdx(0);
       setBlend(0);
+      setOpacityTransition(true);
       return undefined;
     }
     setIdx(0);
     setBlend(0);
+    setOpacityTransition(true);
+    const n = CLOCKER_SCENE_OPTIONS.length;
     const id = window.setInterval(() => {
+      setOpacityTransition(true);
       setBlend(1);
       window.setTimeout(() => {
-        setIdx((i) => (i + 1) % CLOCKER_SCENE_OPTIONS.length);
+        setOpacityTransition(false);
+        setIdx((i) => (i + 1) % n);
         setBlend(0);
+        requestAnimationFrame(() => {
+          setOpacityTransition(true);
+        });
       }, SPLASH_CROSSFADE_MS);
     }, SPLASH_ZOOM_CYCLE_MS);
     return () => window.clearInterval(id);
@@ -215,7 +225,9 @@ function ParticipantSplashBackdrop({ active }) {
 
   if (!active) return null;
 
-  const tf = `opacity ${SPLASH_CROSSFADE_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`;
+  const tf = opacityTransition
+    ? `opacity ${SPLASH_CROSSFADE_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`
+    : 'none';
 
   const n = CLOCKER_SCENE_OPTIONS.length;
   const sceneBottom = CLOCKER_SCENE_OPTIONS[idx].id;
