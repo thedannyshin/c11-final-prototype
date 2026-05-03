@@ -1565,6 +1565,7 @@ function HostView({ room, shared, onResetRoom }) {
   const [hostFullscreen, setHostFullscreen] = useState(false);
   const [hudIdleHidden, setHudIdleHidden] = useState(false);
   const [splashBgChosen, setSplashBgChosen] = useState(false);
+  const [pinchHintVisible, setPinchHintVisible] = useState(false);
   const [splashRotateIdx, setSplashRotateIdx] = useState(0);
   const prevPhaseForSplashRef = useRef(shared.game.phase);
   const hudIdleTimerRef = useRef(null);
@@ -1834,6 +1835,16 @@ function HostView({ room, shared, onResetRoom }) {
   const cd = getCountdownDisplay(g);
   const showPlayHud = g.phase === 'team1' || g.phase === 'team2';
 
+  useEffect(() => {
+    if (!showPlayHud) {
+      setPinchHintVisible(false);
+      return undefined;
+    }
+    setPinchHintVisible(true);
+    const t = window.setTimeout(() => setPinchHintVisible(false), 2600);
+    return () => window.clearTimeout(t);
+  }, [showPlayHud, g.phase]);
+
   return (
     <div
       className={`host-fullscreen${hudIdleHidden && g.phase !== 'splash' ? ' host-fullscreen--ui-idle' : ''}${
@@ -1850,8 +1861,9 @@ function HostView({ room, shared, onResetRoom }) {
         >
           <div className="host-flow-inner host-flow-inner--splash-card">
             <p className="clockit-wordmark">ClockIt</p>
-            <p className="host-flow-splash-lead">Form 2 teams of 2.</p>
-            <p className="host-flow-splash-lead">Have your partner scan this QR code.</p>
+            <p className="host-flow-splash-lead">
+              Form 2 teams of 2. Have your partner scan this QR code.
+            </p>
             <QRCodeSVG value={joinUrl} size={200} bgColor="transparent" fgColor="#ffffff" />
             <div className="host-flow-scene">
               <select
@@ -1960,7 +1972,12 @@ function HostView({ room, shared, onResetRoom }) {
             </div>
             {g.roundEndAt ? <p className="host-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
           </div>
-          <p className="host-play-hint">Pinch to grab creatures and move them to the right side.</p>
+          <p
+            className={`host-play-hint${pinchHintVisible ? '' : ' host-play-hint--faded'}`}
+            aria-hidden={!pinchHintVisible}
+          >
+            Pinch to grab creatures and move them to the right side.
+          </p>
         </div>
       ) : null}
 
@@ -2102,7 +2119,10 @@ function HostView({ room, shared, onResetRoom }) {
       </div>
       ) : null}
 
-      {g.phase !== 'splash' && !showPlayHud ? (
+      {g.phase !== 'splash' &&
+      !showPlayHud &&
+      g.phase !== 'countdown_team1' &&
+      g.phase !== 'countdown_team2' ? (
         <div className="qr-corner">
           <div className="qr-label">Join on your phone</div>
           <QRCodeSVG value={joinUrl} size={110} bgColor="transparent" fgColor="#ffffff" />
@@ -2123,6 +2143,7 @@ function HostView({ room, shared, onResetRoom }) {
 
 function ParticipantView({ shared, clientName, setClientName, clientColor }) {
   const [, forceClockTick] = useState(0);
+  const [drawHintVisible, setDrawHintVisible] = useState(false);
   const scene = normalizeRoomBackground(shared.roomBackground);
   const bgUrl = HOST_BG_BY_SCENE[scene] ?? HOST_BG_BY_SCENE.water;
   const gm = shared.game;
@@ -2135,6 +2156,16 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
     const id = window.setInterval(() => forceClockTick((n) => n + 1), 250);
     return () => window.clearInterval(id);
   }, [gm.phase, gm.roundEndAt]);
+
+  useEffect(() => {
+    if (!inDrawRound) {
+      setDrawHintVisible(false);
+      return undefined;
+    }
+    setDrawHintVisible(true);
+    const t = window.setTimeout(() => setDrawHintVisible(false), 2600);
+    return () => window.clearTimeout(t);
+  }, [inDrawRound, gm.phase]);
 
   return (
     <div
@@ -2161,15 +2192,25 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
       ) : null}
 
       {gm.phase === 'results_team1' ? (
-        <div className="participant-flow-overlay participant-flow-overlay--results">
-          <p className="participant-flow-results-title">Time&apos;s Up!</p>
+        <div
+          className="participant-flow-overlay participant-flow-overlay--splash participant-flow-overlay--results"
+          aria-live="polite"
+        >
+          <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
+          <p className="participant-flow-results-title">Time&apos;s up</p>
+          <p className="participant-flow-results-sub">Round complete — nice work.</p>
           <p className="participant-flow-results-score">Team 1 — {gm.team1Score} pts</p>
         </div>
       ) : null}
 
       {gm.phase === 'results_team2' ? (
-        <div className="participant-flow-overlay participant-flow-overlay--results">
-          <p className="participant-flow-results-title">Time&apos;s Up!</p>
+        <div
+          className="participant-flow-overlay participant-flow-overlay--splash participant-flow-overlay--results"
+          aria-live="polite"
+        >
+          <p className="clockit-wordmark clockit-wordmark--phone">ClockIt</p>
+          <p className="participant-flow-results-title">Time&apos;s up</p>
+          <p className="participant-flow-results-sub">Round complete — nice work.</p>
           <p className="participant-flow-results-score">Team 2 — {gm.team2Score} pts</p>
         </div>
       ) : null}
@@ -2198,7 +2239,10 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
               {gm.roundEndAt ? formatRoundClock(gm.roundEndAt) : '—'}
             </span>
           </div>
-          <p className="participant-draw-hint">
+          <p
+            className={`participant-draw-hint${drawHintVisible ? '' : ' participant-draw-hint--faded'}`}
+            aria-hidden={!drawHintVisible}
+          >
             Draw as fast as you can—send as many creatures as you can before time runs out.
           </p>
           <DrawingPad onCommit={shared.addCharacter} />
