@@ -355,14 +355,15 @@ function getJoinUrl(room) {
   return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(room)}&mode=participant`;
 }
 
-/** Stable join order: sorted participant clientIds → slots 0–1 Team 1, 2–3 Team 2 (repeats for 5+). */
+/** Roster: sorted participant clientIds → first = Team 1, second = Team 2; max one phone per team (2 total). */
 function computeAutoParticipantTeam(clientId, participants) {
   const ids = Object.keys(participants || {})
     .filter((id) => (participants[id]?.role || '') === 'participant')
     .sort();
   const idx = ids.indexOf(clientId);
-  if (idx < 0) return 1;
-  return idx % 4 < 2 ? 1 : 2;
+  if (idx < 0) return null;
+  if (idx >= 2) return null;
+  return idx === 0 ? 1 : 2;
 }
 
 /** True for phone / tablet widths; wide screens default to host, narrow to participant when URL does not specify. */
@@ -1976,7 +1977,7 @@ function HostView({ room, shared, onResetRoom }) {
           <div className="host-flow-inner host-flow-inner--splash-card">
             <ClockItLogo />
             <p className="host-flow-splash-lead">
-              Form 2 teams of 2. Have your partner scan this QR code.
+              One phone per team (two players total). Each person scans this QR code.
             </p>
             <QRCodeSVG value={joinUrl} size={140} bgColor="transparent" fgColor="#ffffff" />
             <div className="host-flow-scene">
@@ -2261,7 +2262,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
     <div
       className={`participant-shell${gm.phase === 'splash' ? ' participant-shell--splash-mode' : ''}`}
       data-scene={scene}
-      data-my-team={String(assignedTeam)}
+      data-my-team={assignedTeam == null ? 'none' : String(assignedTeam)}
       style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
     >
       {gm.phase === 'splash' ? (
@@ -2279,7 +2280,18 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
               Get ready to draw on your phone. During your round, draw quickly and send as many creatures as possible.
             </p>
             <p className="participant-assigned-team" role="status" aria-live="polite">
-              You&apos;re on <strong>Team {assignedTeam}</strong>
+              {assignedTeam === 1 || assignedTeam === 2 ? (
+                <>
+                  You&apos;re on <strong>Team {assignedTeam}</strong>
+                </>
+              ) : shared.participants?.[clientId] ? (
+                <>
+                  This room already has <strong>two players</strong> (one per team). Watch the main screen — you
+                  won&apos;t draw from this phone.
+                </>
+              ) : (
+                <>Joining room…</>
+              )}
             </p>
           </div>
         </div>
@@ -2359,12 +2371,22 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
             </div>
           </div>
           {!myTurnToDraw ? (
-            <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
-              <ClockItLogo variant="phone" />
-              <p className="participant-flow-results-title">
-                Team {gm.phase === 'team1' ? 1 : 2}&apos;s turn
-              </p>
-            </div>
+            assignedTeam === 1 || assignedTeam === 2 ? (
+              <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
+                <ClockItLogo variant="phone" />
+                <p className="participant-flow-results-title">
+                  Team {gm.phase === 'team1' ? 1 : 2}&apos;s turn
+                </p>
+              </div>
+            ) : (
+              <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
+                <ClockItLogo variant="phone" />
+                <p className="participant-flow-results-title">Room is full</p>
+                <p className="participant-flow-wait">
+                  Two phones are already assigned (Team 1 and Team 2). Watch the host screen.
+                </p>
+              </div>
+            )
           ) : (
             <DrawingPad
               onCommit={(character) => {
