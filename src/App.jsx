@@ -139,12 +139,13 @@ async function exitBrowserFullscreen() {
   else if (typeof document.webkitExitFullscreen === 'function') await document.webkitExitFullscreen();
 }
 
-function HudIconNewRoom() {
+function HudIconRestart() {
   return (
     <svg className="hud-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <line x1="12" y1="8" x2="12" y2="16" />
-      <line x1="8" y1="12" x2="16" y2="12" />
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 3" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 21" />
+      <path d="M3 21v-5h5" />
     </svg>
   );
 }
@@ -1735,7 +1736,7 @@ function HostView({ room, shared, onResetRoom }) {
 
   return (
     <div
-      className={`host-fullscreen${hudIdleHidden ? ' host-fullscreen--ui-idle' : ''}`}
+      className={`host-fullscreen${hudIdleHidden && g.phase !== 'splash' ? ' host-fullscreen--ui-idle' : ''}`}
       ref={hostRootRef}
     >
       <audio ref={audioRef} loop preload="metadata" />
@@ -1843,18 +1844,16 @@ function HostView({ room, shared, onResetRoom }) {
         />
       </div>
 
-      <div
-        className={`host-hud${hudIdleHidden ? ' host-hud--idle-hidden' : ''}`}
-        aria-hidden={hudIdleHidden}
-      >
+      {g.phase === 'splash' ? (
+      <div className="host-hud host-hud--start-screen">
         <button
           type="button"
           className="hud-btn hud-btn--icon"
           onClick={onResetRoom}
-          aria-label="New room"
-          title="New room"
+          aria-label="Restart"
+          title="Restart — new room code"
         >
-          <HudIconNewRoom />
+          <HudIconRestart />
         </button>
         <span className="hud-divider" />
         <button
@@ -1941,6 +1940,7 @@ function HostView({ room, shared, onResetRoom }) {
           </select>
         </div>
       </div>
+      ) : null}
 
       {g.phase !== 'splash' && !showPlayHud ? (
         <div className="qr-corner">

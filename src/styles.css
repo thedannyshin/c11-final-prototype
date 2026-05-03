@@ -819,6 +819,11 @@ p {
   transition: opacity 0.28s ease, visibility 0.28s ease;
 }
 
+/* Above .host-flow-overlay (z-index 100) on splash — wins over base .host-hud z-index */
+.host-hud.host-hud--start-screen {
+  z-index: 110;
+}
+
 .host-hud--idle-hidden {
   opacity: 0;
   visibility: hidden;
