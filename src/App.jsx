@@ -2115,6 +2115,94 @@ function HostView({ room, shared, onResetRoom }) {
               </button>
             </div>
           </div>
+          <div className="host-hud host-hud--start-screen">
+            <button
+              type="button"
+              className="hud-btn hud-btn--icon"
+              data-host-gesture="hud-fullscreen"
+              onClick={toggleHostFullscreen}
+              aria-label={hostFullscreen ? 'Exit full screen' : 'Full screen'}
+              title={hostFullscreen ? 'Exit full screen' : 'Full screen'}
+            >
+              {hostFullscreen ? <HudIconFullscreenExit /> : <HudIconFullscreenEnter />}
+            </button>
+            <span className="hud-divider" />
+            <div className="hud-music-wrap">
+              <button
+                type="button"
+                className={`hud-btn hud-btn--icon${playing ? ' hud-btn-active' : ''}`}
+                data-host-gesture="hud-music"
+                onClick={toggleMusic}
+                aria-label={playing ? 'Pause music' : 'Play music'}
+                title={playing ? 'Pause music' : 'Play music'}
+              >
+                {playing ? <HudIconMusic /> : <HudIconMusicOff />}
+              </button>
+              <div
+                className="hud-volume-rail"
+                aria-label="Music volume"
+                title={playing ? undefined : `Paused — will play at ${Math.round(musicVolume * 100)}%`}
+              >
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={playing ? musicVolume : 0}
+                  disabled={!playing}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    setMusicVolume(Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1);
+                  }}
+                />
+                <span className="hud-volume-rail-value">
+                  {playing ? `${Math.round(musicVolume * 100)}%` : '0%'}
+                </span>
+              </div>
+            </div>
+            <span className="hud-divider" />
+            <div className="hud-camera-control">
+              <button
+                type="button"
+                className={`hud-btn hud-btn--icon${handEnabled ? ' hud-btn-active' : ''}`}
+                data-host-gesture="hud-webcam"
+                onClick={() => setHandEnabled((v) => !v)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  const sel = cameraSelectRef.current;
+                  if (!sel) return;
+                  Promise.resolve(refreshVideoDevices()).then(() => {
+                    if (typeof sel.showPicker === 'function') {
+                      sel.showPicker().catch(() => { try { sel.click(); } catch (_) { /* noop */ } });
+                    } else {
+                      try { sel.click(); } catch (_) { /* noop */ }
+                    }
+                  });
+                }}
+                title="Tap: hand tracking on/off · Right-click: choose webcam"
+                aria-label="Hand tracking and webcam. Toggle on click. Right-click to choose camera."
+                aria-pressed={handEnabled}
+              >
+                <HudIconWebcam />
+              </button>
+              <select
+                ref={cameraSelectRef}
+                className="hud-select hud-select--camera-hidden"
+                value={cameraDeviceId}
+                onChange={(e) => setCameraDeviceId(e.target.value)}
+                aria-hidden
+                tabIndex={-1}
+                title="Choose webcam"
+              >
+                <option value="">Default camera</option>
+                {videoInputs.map((d, i) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label?.trim() ? d.label : `Camera ${i + 1}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -2242,97 +2330,6 @@ function HostView({ room, shared, onResetRoom }) {
           <SideAquarium creatures={sideCreatures} scene={displayScene} />
         ) : null}
       </div>
-
-      {g.phase === 'splash' ? (
-      <div className="host-hud host-hud--start-screen">
-        <button
-          type="button"
-          className="hud-btn hud-btn--icon"
-          data-host-gesture="hud-fullscreen"
-          onClick={toggleHostFullscreen}
-          aria-label={hostFullscreen ? 'Exit full screen' : 'Full screen'}
-          title={hostFullscreen ? 'Exit full screen' : 'Full screen'}
-        >
-          {hostFullscreen ? <HudIconFullscreenExit /> : <HudIconFullscreenEnter />}
-        </button>
-        <span className="hud-divider" />
-        <div className="hud-music-wrap">
-          <button
-            type="button"
-            className={`hud-btn hud-btn--icon${playing ? ' hud-btn-active' : ''}`}
-            data-host-gesture="hud-music"
-            onClick={toggleMusic}
-            aria-label={playing ? 'Pause music' : 'Play music'}
-            title={playing ? 'Pause music' : 'Play music'}
-          >
-            {playing ? <HudIconMusic /> : <HudIconMusicOff />}
-          </button>
-          <div
-            className="hud-volume-rail"
-            aria-label="Music volume"
-            title={playing ? undefined : `Paused — will play at ${Math.round(musicVolume * 100)}%`}
-          >
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={playing ? musicVolume : 0}
-              disabled={!playing}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                setMusicVolume(Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1);
-              }}
-            />
-            <span className="hud-volume-rail-value">
-              {playing ? `${Math.round(musicVolume * 100)}%` : '0%'}
-            </span>
-          </div>
-        </div>
-        <span className="hud-divider" />
-        <div className="hud-camera-control">
-          <button
-            type="button"
-            className={`hud-btn hud-btn--icon${handEnabled ? ' hud-btn-active' : ''}`}
-            data-host-gesture="hud-webcam"
-            onClick={() => setHandEnabled((v) => !v)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              const sel = cameraSelectRef.current;
-              if (!sel) return;
-              Promise.resolve(refreshVideoDevices()).then(() => {
-                if (typeof sel.showPicker === 'function') {
-                  sel.showPicker().catch(() => { try { sel.click(); } catch (_) { /* noop */ } });
-                } else {
-                  try { sel.click(); } catch (_) { /* noop */ }
-                }
-              });
-            }}
-            title="Tap: hand tracking on/off · Right-click: choose webcam"
-            aria-label="Hand tracking and webcam. Toggle on click. Right-click to choose camera."
-            aria-pressed={handEnabled}
-          >
-            <HudIconWebcam />
-          </button>
-          <select
-            ref={cameraSelectRef}
-            className="hud-select hud-select--camera-hidden"
-            value={cameraDeviceId}
-            onChange={(e) => setCameraDeviceId(e.target.value)}
-            aria-hidden
-            tabIndex={-1}
-            title="Choose webcam"
-          >
-            <option value="">Default camera</option>
-            {videoInputs.map((d, i) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.label?.trim() ? d.label : `Camera ${i + 1}`}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      ) : null}
 
       <HeldCreatureOverlay creature={heldCreature} pos={fingertipPos} />
 

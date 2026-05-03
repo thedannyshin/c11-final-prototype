@@ -619,6 +619,8 @@ p {
   -webkit-backdrop-filter: none;
   /* Catch taps outside the card so the full-screen aquarium canvas cannot steal touches / pinches. */
   pointer-events: auto;
+  /* Keep HUD + card stacking predictable on mobile (avoids sibling compositor bugs vs host-layout). */
+  isolation: isolate;
 }
 
 .host-flow-inner--splash-card {
@@ -1179,12 +1181,22 @@ p {
   transition: opacity 0.28s ease, visibility 0.28s ease;
 }
 
-/* Above .host-flow-overlay (z-index 100) on splash — wins over base .host-hud z-index */
 .host-hud.host-hud--start-screen {
-  z-index: 110;
   padding: 14px 22px;
   gap: 14px;
   row-gap: 10px;
+}
+
+/* Docked inside splash overlay so touches always hit the bar, not the layer below. */
+.host-flow-overlay--splash > .host-hud.host-hud--start-screen {
+  position: absolute;
+  left: auto;
+  top: auto;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 50;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
 }
 
 .host-hud.host-hud--start-screen .hud-btn--icon {
