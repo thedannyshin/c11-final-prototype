@@ -623,8 +623,8 @@ p {
 .host-flow-inner--splash-card {
   pointer-events: auto;
   width: 100%;
-  max-width: 22rem;
-  padding: 28px 24px 26px;
+  max-width: min(96vw, 34rem);
+  padding: 28px 22px 26px;
   border-radius: 24px;
   background: rgba(5, 14, 28, 0.82);
   backdrop-filter: blur(18px);
@@ -638,7 +638,7 @@ p {
   align-items: center;
   gap: 20px;
   text-align: center;
-  max-width: 22rem;
+  max-width: min(96vw, 34rem);
 }
 
 /* PNG logo — width-only scaling; height: auto keeps file aspect ratio */
