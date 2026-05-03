@@ -697,49 +697,19 @@ p {
   letter-spacing: 0.02em;
 }
 
-.host-flow-qr {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 13px;
-  margin: 2px 0 0;
-  border-radius: 22px;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.26) 0%,
-    rgba(0, 212, 255, 0.1) 42%,
-    rgba(167, 139, 250, 0.14) 100%
-  );
+.host-flow-qrcode-wrap {
+  padding: clamp(11px, 2.8vw, 14px);
+  border-radius: clamp(18px, 4vw, 26px);
+  background: rgba(255, 255, 255, 0.97);
+  border: 2px solid rgba(255, 255, 255, 0.95);
   box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.42),
-    0 10px 36px rgba(0, 8, 22, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38);
+    0 14px 44px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(0, 212, 255, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
 }
 
-.host-flow-qr-badge {
-  position: absolute;
-  top: -7px;
-  right: -6px;
-  padding: 5px 11px;
-  border-radius: 999px;
-  font-size: clamp(0.62rem, 1.8vw, 0.72rem);
-  font-weight: 900;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: #07242e;
-  background: linear-gradient(135deg, #9ef6ff 0%, #c4b5fd 55%, #fde68a 100%);
-  box-shadow:
-    0 2px 12px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  transform: rotate(7deg);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.host-flow-qr-svg {
+.host-flow-qrcode-wrap svg {
   display: block;
-  filter: drop-shadow(0 2px 16px rgba(0, 212, 255, 0.28));
 }
 
 .host-flow-scene {

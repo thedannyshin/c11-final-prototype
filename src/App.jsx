@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
+import { RoundedQRCodeSVG } from './RoundedQRCode.jsx';
 import {
   getDatabase,
   ref as dbRef,
@@ -1981,25 +1981,14 @@ function HostView({ room, shared, onResetRoom }) {
               <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
               <p className="host-flow-splash-lead">Artist → scan the QR below</p>
             </div>
-            <div className="host-flow-qr">
-              <span className="host-flow-qr-badge" aria-hidden="true">
-                Join!
-              </span>
-              <QRCodeSVG
-                className="host-flow-qr-svg"
+            <div className="host-flow-qrcode-wrap">
+              <RoundedQRCodeSVG
                 value={joinUrl}
-                size={156}
-                level="H"
-                marginSize={1}
-                bgColor="transparent"
-                fgColor="#f5ffff"
-                title="Scan to join this ClockIt room"
-                imageSettings={{
-                  src: CLOCKIT_LOGO_PATH,
-                  height: 28,
-                  width: 28,
-                  excavate: true,
-                }}
+                size={152}
+                fgColor="#0c1528"
+                cornerRadius={0.4}
+                level="M"
+                title="Scan this QR code on your phone to join as artist"
               />
             </div>
             <div className="host-flow-scene">
