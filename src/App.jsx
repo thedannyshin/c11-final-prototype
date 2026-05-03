@@ -357,6 +357,25 @@ function getJoinUrl(room) {
   return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(room)}&mode=participant`;
 }
 
+const PARTICIPANT_TEAM_STORAGE_PREFIX = 'clockit-participant-team-';
+
+function readStoredParticipantTeam(roomId) {
+  if (!roomId) return null;
+  try {
+    const v = sessionStorage.getItem(PARTICIPANT_TEAM_STORAGE_PREFIX + roomId);
+    if (v === '1' || v === '2') return Number(v);
+  } catch (_) { /* noop */ }
+  return null;
+}
+
+function writeStoredParticipantTeam(roomId, team) {
+  if (!roomId) return;
+  try {
+    if (team == null) sessionStorage.removeItem(PARTICIPANT_TEAM_STORAGE_PREFIX + roomId);
+    else sessionStorage.setItem(PARTICIPANT_TEAM_STORAGE_PREFIX + roomId, String(team));
+  } catch (_) { /* noop */ }
+}
+
 /** True for phone / tablet widths; wide screens default to host, narrow to participant when URL does not specify. */
 function isMobileViewport() {
   if (typeof window === 'undefined') return false;
@@ -794,6 +813,29 @@ function useSharedRoom(roomId, client) {
   const transportRef = useRef(null);
   const gameRef = useRef(game);
   gameRef.current = game;
+  const presencePayloadRef = useRef({
+    name: client.name,
+    role: client.role,
+    color: client.color,
+    team: client.team,
+  });
+  presencePayloadRef.current = {
+    name: client.name,
+    role: client.role,
+    color: client.color,
+    team: client.team,
+  };
+
+  function sendPresencePayload(transport) {
+    const p = presencePayloadRef.current;
+    const payload = { name: p.name, role: p.role, color: p.color };
+    if (p.team === 1 || p.team === 2) payload.team = p.team;
+    transport.send({
+      type: 'presence:update',
+      clientId: client.clientId,
+      payload,
+    });
+  }
 
   useEffect(() => {
     if (!roomId) return undefined;
@@ -852,11 +894,7 @@ function useSharedRoom(roomId, client) {
     });
 
     const heartbeat = setInterval(() => {
-      transport.send({
-        type: 'presence:update',
-        clientId: client.clientId,
-        payload: { name: client.name, role: client.role, color: client.color },
-      });
+      sendPresencePayload(transport);
     }, 2000);
 
     return () => {
@@ -864,7 +902,13 @@ function useSharedRoom(roomId, client) {
       unsub?.();
       transport.destroy();
     };
-  }, [roomId, client.clientId, client.name, client.role, client.color]);
+  }, [roomId, client.clientId]);
+
+  useEffect(() => {
+    if (!transportRef.current || !roomId) return undefined;
+    sendPresencePayload(transportRef.current);
+    return undefined;
+  }, [roomId, client.clientId, client.team]);
 
   // Prune stale participants.
   useEffect(() => {
@@ -1657,6 +1701,8 @@ function HostView({ room, shared, onResetRoom }) {
   const [hostFullscreen, setHostFullscreen] = useState(false);
   const [hudIdleHidden, setHudIdleHidden] = useState(false);
   const [splashBgChosen, setSplashBgChosen] = useState(false);
+  /** While on splash with no background yet: play each scene’s music file to completion, then the next */
+  const [splashPreSelectMusicIdx, setSplashPreSelectMusicIdx] = useState(0);
   const [pinchHintVisible, setPinchHintVisible] = useState(false);
   const [splashRotateIdx, setSplashRotateIdx] = useState(0);
   const prevPhaseForSplashRef = useRef(shared.game.phase);
@@ -1863,6 +1909,7 @@ function HostView({ room, shared, onResetRoom }) {
     if (gPhase === 'splash' && prevPhaseForSplashRef.current !== 'splash') {
       setSplashBgChosen(false);
       setSplashRotateIdx(0);
+      setSplashPreSelectMusicIdx(0);
     }
     prevPhaseForSplashRef.current = gPhase;
   }, [gPhase]);
@@ -1880,7 +1927,11 @@ function HostView({ room, shared, onResetRoom }) {
       ? HOST_SCENE_OPTIONS[splashRotateIdx].id
       : normalizeRoomBackground(shared.roomBackground);
 
-  const musicSrc = HOST_MUSIC_BY_SCENE[displayScene] ?? HOST_MUSIC_BY_SCENE.water;
+  const splashMusicPlaylistMode = gPhase === 'splash' && !splashBgChosen;
+  const musicSceneForAudio = splashMusicPlaylistMode
+    ? HOST_SCENE_OPTIONS[splashPreSelectMusicIdx % HOST_SCENE_OPTIONS.length].id
+    : displayScene;
+  const musicSrc = HOST_MUSIC_BY_SCENE[musicSceneForAudio] ?? HOST_MUSIC_BY_SCENE.water;
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -1895,6 +1946,16 @@ function HostView({ room, shared, onResetRoom }) {
       audio.volume = 0;
     }
   }, [musicSrc, playing]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !splashMusicPlaylistMode) return undefined;
+    const onEnded = () => {
+      setSplashPreSelectMusicIdx((i) => (i + 1) % HOST_SCENE_OPTIONS.length);
+    };
+    audio.addEventListener('ended', onEnded);
+    return () => audio.removeEventListener('ended', onEnded);
+  }, [splashMusicPlaylistMode]);
 
   const toggleMusic = () => {
     const audio = audioRef.current;
@@ -1944,7 +2005,7 @@ function HostView({ room, shared, onResetRoom }) {
       }`}
       ref={hostRootRef}
     >
-      <audio ref={audioRef} loop preload="metadata" />
+      <audio ref={audioRef} loop={!splashMusicPlaylistMode} preload="metadata" />
 
       {g.phase === 'splash' ? (
         <div
@@ -2065,6 +2126,7 @@ function HostView({ room, shared, onResetRoom }) {
             {g.roundEndAt ? <p className="host-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
           </div>
           <p
+            key={`host-pinch-hint-${g.phase}`}
             className={`host-play-hint${pinchHintVisible ? '' : ' host-play-hint--faded'}`}
             aria-hidden={!pinchHintVisible}
           >
@@ -2233,13 +2295,17 @@ function HostView({ room, shared, onResetRoom }) {
   );
 }
 
-function ParticipantView({ shared, clientName, setClientName, clientColor }) {
+function ParticipantView({ shared, clientName, setClientName, clientColor, participantTeam, setParticipantTeam }) {
   const [, forceClockTick] = useState(0);
   const [drawHintVisible, setDrawHintVisible] = useState(false);
   const scene = normalizeRoomBackground(shared.roomBackground);
   const bgUrl = HOST_BG_BY_SCENE[scene] ?? HOST_BG_BY_SCENE.water;
   const gm = shared.game;
   const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
+  const myTurnToDraw =
+    inDrawRound &&
+    participantTeam != null &&
+    ((gm.phase === 'team1' && participantTeam === 1) || (gm.phase === 'team2' && participantTeam === 2));
   const cdPhone = getCountdownDisplay(gm);
 
   useEffect(() => {
@@ -2263,8 +2329,38 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
     <div
       className={`participant-shell${gm.phase === 'splash' ? ' participant-shell--splash-mode' : ''}`}
       data-scene={scene}
+      data-my-team={participantTeam === 1 || participantTeam === 2 ? String(participantTeam) : undefined}
       style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
     >
+      <div
+        className={`participant-team-strip${
+          participantTeam === 1
+            ? ' participant-team-strip--1'
+            : participantTeam === 2
+              ? ' participant-team-strip--2'
+              : ' participant-team-strip--unset'
+        }`}
+        role="status"
+        aria-live="polite"
+      >
+        {participantTeam === 1 || participantTeam === 2 ? (
+          <>
+            <span className="participant-team-strip-label">You&apos;re on</span>
+            <span className="participant-team-strip-name">Team {participantTeam}</span>
+          </>
+        ) : (
+          <>
+            <span className="participant-team-strip-hint">Your team</span>
+            <button type="button" className="participant-team-chip" onClick={() => setParticipantTeam(1)}>
+              Team 1
+            </button>
+            <button type="button" className="participant-team-chip" onClick={() => setParticipantTeam(2)}>
+              Team 2
+            </button>
+          </>
+        )}
+      </div>
+
       {gm.phase === 'splash' ? (
         <ParticipantSplashBackdrop
           active
@@ -2280,6 +2376,28 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
               Get ready—you&apos;ll draw on this phone. When your round starts, draw as fast as you can and send as many
               creatures as you can.
             </p>
+            <div className="participant-team-picker" role="group" aria-label="Your team for this game">
+              <p className="participant-team-picker-title">Your team</p>
+              <p className="participant-team-picker-hint">Pick the same team you&apos;re paired with (two phones per team).</p>
+              <div className="participant-team-picker-row">
+                <button
+                  type="button"
+                  className={`participant-team-btn${participantTeam === 1 ? ' is-selected' : ''}`}
+                  onClick={() => setParticipantTeam(1)}
+                  aria-pressed={participantTeam === 1}
+                >
+                  Team 1
+                </button>
+                <button
+                  type="button"
+                  className={`participant-team-btn${participantTeam === 2 ? ' is-selected' : ''}`}
+                  onClick={() => setParticipantTeam(2)}
+                  aria-pressed={participantTeam === 2}
+                >
+                  Team 2
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       ) : null}
@@ -2340,17 +2458,28 @@ function ParticipantView({ shared, clientName, setClientName, clientColor }) {
               {gm.roundEndAt ? formatRoundClock(gm.roundEndAt) : '—'}
             </span>
           </div>
-          <DrawingPad
-            onCommit={shared.addCharacter}
-            overlay={
-              <p
-                className={`participant-draw-hint${drawHintVisible ? '' : ' participant-draw-hint--faded'}`}
-                aria-hidden={!drawHintVisible}
-              >
-                Draw as fast as you can—send as many creatures as you can before time runs out.
+          {participantTeam != null && !myTurnToDraw ? (
+            <div className="participant-sitout-card">
+              <p className="participant-sitout-title">Team {gm.phase === 'team1' ? 1 : 2}&apos;s draw round</p>
+              <p className="participant-sitout-copy">
+                You&apos;re on Team {participantTeam}. This timed round is for the other pair — watch the main screen until
+                it&apos;s your team&apos;s turn.
               </p>
-            }
-          />
+            </div>
+          ) : (
+            <DrawingPad
+              onCommit={shared.addCharacter}
+              overlay={
+                <p
+                  key={`participant-draw-hint-${gm.phase}`}
+                  className={`participant-draw-hint${drawHintVisible ? '' : ' participant-draw-hint--faded'}`}
+                  aria-hidden={!drawHintVisible}
+                >
+                  Draw as fast as you can—send as many creatures as you can before time runs out.
+                </p>
+              }
+            />
+          )}
         </>
       ) : null}
     </div>
@@ -2412,6 +2541,7 @@ export default function App() {
   const [mode, setMode] = useState(initial.mode);
   const [roomInput, setRoomInput] = useState(initial.roomInput);
   const [clientName, setClientName] = useState('');
+  const [participantTeam, setParticipantTeamState] = useState(null);
   const clientId = useMemo(() => crypto.randomUUID(), []);
   const clientColor = useMemo(() => COLORS[Math.floor(Math.random() * COLORS.length)], []);
 
@@ -2421,11 +2551,22 @@ export default function App() {
     preloadSceneBackgroundArt();
   }, []);
 
+  useEffect(() => {
+    if (room && mode === 'participant') setParticipantTeamState(readStoredParticipantTeam(room));
+    else setParticipantTeamState(null);
+  }, [room, mode]);
+
+  const setParticipantTeam = useCallback((t) => {
+    writeStoredParticipantTeam(room, t);
+    setParticipantTeamState(t);
+  }, [room]);
+
   const shared = useSharedRoom(room, {
     clientId,
     name: clientName || (mode === 'host' ? 'Host' : 'Anonymous'),
     role: mode || 'participant',
     color: clientColor,
+    team: mode === 'participant' ? participantTeam : undefined,
   });
 
   if (!room || !mode) {
@@ -2469,6 +2610,8 @@ export default function App() {
       clientName={clientName}
       setClientName={setClientName}
       clientColor={clientColor}
+      participantTeam={participantTeam}
+      setParticipantTeam={setParticipantTeam}
     />
   );
 }

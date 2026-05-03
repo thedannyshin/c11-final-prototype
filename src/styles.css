@@ -459,11 +459,13 @@ p {
     0 2px 24px rgba(0, 0, 0, 0.65),
     0 0 40px rgba(0, 0, 0, 0.35);
   line-height: 1.3;
-  transition: opacity 1.15s ease;
+  transform-origin: center center;
+  animation: host-countdown-pop 0.35s ease-out;
 }
 
-.host-play-hint--faded {
-  opacity: 0;
+.host-play-hint.host-play-hint--faded {
+  animation: round-hint-zoom-fade-out 1.05s ease-out forwards;
+  pointer-events: none;
 }
 
 .host-play-active {
@@ -760,6 +762,18 @@ p {
   }
 }
 
+/* Play hints: same in-pop as countdown; out = slight zoom + fade (like a number dissolving) */
+@keyframes round-hint-zoom-fade-out {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.1);
+    opacity: 0;
+  }
+}
+
 .host-flow-overlay--results {
   flex-direction: column;
   gap: 12px;
@@ -951,6 +965,8 @@ p {
   font-weight: 900;
   color: rgba(255, 255, 255, 0.95);
   text-shadow: 0 3px 24px rgba(0, 0, 0, 0.75);
+  transform-origin: center center;
+  animation: host-countdown-pop 0.35s ease-out;
 }
 
 .participant-flow-overlay--results {
@@ -1382,6 +1398,157 @@ p {
   background-repeat: no-repeat;
 }
 
+.participant-team-strip {
+  position: sticky;
+  top: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: -12px -12px 6px;
+  padding: 10px 16px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.participant-team-strip--unset {
+  background: rgba(251, 191, 36, 0.2);
+  color: rgba(254, 243, 199, 0.96);
+}
+
+.participant-team-strip--1 {
+  background: rgba(34, 211, 238, 0.2);
+  color: rgba(207, 250, 254, 0.96);
+}
+
+.participant-team-strip--2 {
+  background: rgba(244, 63, 94, 0.2);
+  color: rgba(255, 228, 235, 0.96);
+}
+
+.participant-team-strip-label {
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  opacity: 0.88;
+}
+
+.participant-team-strip-name {
+  font-size: 1rem;
+}
+
+.participant-team-strip-hint {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-right: 4px;
+}
+
+.participant-team-chip {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.95);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.participant-team-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.participant-team-picker {
+  width: 100%;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.participant-team-picker-title {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.participant-team-picker-hint {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.68);
+  text-align: center;
+}
+
+.participant-team-picker-row {
+  display: flex;
+  gap: 10px;
+}
+
+.participant-team-btn {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.96);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
+}
+
+.participant-team-btn.is-selected {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.12);
+}
+
+.participant-sitout-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(5, 14, 28, 0.5);
+  text-align: center;
+}
+
+.participant-sitout-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.participant-sitout-copy {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.68);
+  max-width: 22rem;
+}
+
 /* Splash: show animated backdrop only — no static scene image on the shell */
 .participant-shell.participant-shell--splash-mode {
   background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.76));
@@ -1427,11 +1594,13 @@ p {
     0 2px 24px rgba(0, 0, 0, 0.65),
     0 0 40px rgba(0, 0, 0, 0.35);
   flex-shrink: 0;
-  transition: opacity 1.15s ease;
+  transform-origin: center center;
+  animation: host-countdown-pop 0.35s ease-out;
 }
 
-.participant-draw-hint--faded {
-  opacity: 0;
+.participant-draw-hint.participant-draw-hint--faded {
+  animation: round-hint-zoom-fade-out 1.05s ease-out forwards;
+  pointer-events: none;
 }
 
 .participant-round-timer {
