@@ -190,15 +190,13 @@ function preloadSceneBackgroundArt() {
   logo.src = CLOCKIT_LOGO_PATH;
 }
 
-/** Phone splash: cycles scene art + crossfade + zoom until Clocker locks a background in Firebase. */
-function ParticipantSplashBackdrop({ active, lockedSceneId }) {
+/** Phone splash / join landing: cycles scene art + crossfade + zoom (not tied to Clocker’s Firebase scene). */
+function ParticipantSplashBackdrop({ active }) {
   const [idx, setIdx] = useState(0);
   const [blend, setBlend] = useState(0);
 
-  const slideshow = active && lockedSceneId == null;
-
   useEffect(() => {
-    if (!slideshow) {
+    if (!active) {
       setIdx(0);
       setBlend(0);
       return undefined;
@@ -213,29 +211,11 @@ function ParticipantSplashBackdrop({ active, lockedSceneId }) {
       }, SPLASH_CROSSFADE_MS);
     }, SPLASH_ZOOM_CYCLE_MS);
     return () => window.clearInterval(id);
-  }, [slideshow]);
+  }, [active]);
 
   if (!active) return null;
 
   const tf = `opacity ${SPLASH_CROSSFADE_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`;
-
-  if (lockedSceneId != null) {
-    const id = normalizeRoomBackground(lockedSceneId);
-    return (
-      <div className="participant-splash-bg" aria-hidden>
-        <div className="participant-splash-bg-zoom">
-          <div
-            className="participant-splash-bg-layer"
-            data-scene={id}
-            style={{
-              opacity: 1,
-              backgroundImage: `url('${CLOCKER_BG_BY_SCENE[id]}')`,
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
 
   const n = CLOCKER_SCENE_OPTIONS.length;
   const sceneBottom = CLOCKER_SCENE_OPTIONS[idx].id;
@@ -2386,12 +2366,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
       data-my-team={assignedTeam == null ? 'none' : String(assignedTeam)}
       style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
     >
-      {gm.phase === 'splash' ? (
-        <ParticipantSplashBackdrop
-          active
-          lockedSceneId={shared.roomBackgroundExplicit ? scene : null}
-        />
-      ) : null}
+      {gm.phase === 'splash' ? <ParticipantSplashBackdrop active /> : null}
 
       {gm.phase === 'splash' ? (
         <div className="participant-flow-overlay participant-flow-overlay--splash">
@@ -2534,7 +2509,7 @@ function JoinLandingView() {
       data-scene="water"
       style={{ '--participant-shell-bg': `url('${CLOCKER_BG_BY_SCENE.water}')` }}
     >
-      <ParticipantSplashBackdrop active lockedSceneId={null} />
+      <ParticipantSplashBackdrop active />
       <div className="participant-flow-overlay participant-flow-overlay--splash">
         <div className="participant-flow-inner participant-flow-inner--splash-card">
           <ClockItLogo variant="phone" />
