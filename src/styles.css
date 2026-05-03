@@ -643,12 +643,28 @@ p {
 }
 
 .participant-shell {
+  --participant-shell-bg: none;
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100dvh;
   padding: 12px;
   gap: 8px;
-  background: linear-gradient(to bottom, #0d2137, #091828 55%, #050e18);
+  isolation: isolate;
+  /* Solid fallback while image loads (matches AquariumCanvas empty gradient). */
+  background-color: #080c14;
+  background-image: var(--participant-shell-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Same bottom vignette as host AquariumCanvas for grass + starry (not water). */
+.participant-shell[data-scene='grass'],
+.participant-shell[data-scene='stars'] {
+  background-image:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0) 52%, rgba(5, 10, 22, 0.45) 100%),
+    var(--participant-shell-bg);
 }
 
 .participant-header {
@@ -837,11 +853,17 @@ p {
   pointer-events: none;
 }
 
-.participant-header .pill {
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.75);
-  border: 1px solid rgba(255,255,255,0.1);
+.participant-room-code {
+  flex-shrink: 0;
   align-self: center;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.88);
+  white-space: nowrap;
 }
 
 .participant-scene-select {

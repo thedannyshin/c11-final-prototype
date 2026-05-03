@@ -1654,12 +1654,18 @@ function ParticipantHowToModal({ open, onClose }) {
 
 function ParticipantView({ room, shared, clientName, setClientName, clientColor }) {
   const [howToOpen, setHowToOpen] = useState(false);
+  const scene = normalizeRoomBackground(shared.roomBackground);
+  const bgUrl = HOST_BG_BY_SCENE[scene] ?? HOST_BG_BY_SCENE.water;
 
   return (
-    <div className="participant-shell">
+    <div
+      className="participant-shell"
+      data-scene={scene}
+      style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
+    >
       <ParticipantHowToModal open={howToOpen} onClose={() => setHowToOpen(false)} />
       <div className="participant-header">
-        <span className="pill">Room {room}</span>
+        <span className="participant-room-code">{room}</span>
         <div className="participant-scene-wrap">
           <select
             className="participant-scene-select"
