@@ -1180,7 +1180,7 @@ function useSharedRoom(roomId, client) {
 // positionsRef — ref that this component fills each frame with [{id,x,y}]
 // teleportRef — ref set by ClockerView when a creature is dropped: {id, x, y}
 //               normalised; AquariumCanvas consumes it and moves the creature
-// scene            — key in CLOCKER_BG_BY_SCENE (full-bleed art + vignette).
+// scene            — key in CLOCKER_BG_BY_SCENE (full-bleed art).
 // splashBgEffects  — when true, crossfade + slow zoom while splash preview rotates.
 // ---------------------------------------------------------------------------
 function AquariumCanvas({
@@ -1285,7 +1285,6 @@ function AquariumCanvas({
       const splashFx = splashFxRef.current;
 
       let drewBg = false;
-      let vignetteScene = target;
 
       if (splashFx) {
         if (!fade && target !== committedScene) {
@@ -1319,19 +1318,16 @@ function AquariumCanvas({
             segmentStart = ts - zoomProgress * SPLASH_ZOOM_CYCLE_MS;
             fade = null;
           }
-          vignetteScene = fade ? fade.to : committedScene;
         } else {
           const zoom = 1 + SPLASH_ZOOM_AMOUNT * Math.min(1, (ts - segmentStart) / SPLASH_ZOOM_CYCLE_MS);
           const bgImg = bgImgBySceneRef.current[committedScene];
           drewBg = drawCoverImageZoomed(ctx, bgImg, W, H, zoom);
-          vignetteScene = committedScene;
         }
       } else {
         fade = null;
         committedScene = target;
         const bgImg = bgImgBySceneRef.current[target];
         drewBg = drawCoverImage(ctx, bgImg, W, H);
-        vignetteScene = target;
       }
 
       if (!drewBg) {
@@ -1340,29 +1336,6 @@ function AquariumCanvas({
         fall.addColorStop(1, '#080c14');
         ctx.fillStyle = fall;
         ctx.fillRect(0, 0, W, H);
-      }
-
-      if (!(vignetteScene === 'water' && drewBg)) {
-        const vign = ctx.createLinearGradient(0, H * 0.5, 0, H);
-        vign.addColorStop(0, 'rgba(0,0,0,0)');
-        vign.addColorStop(1, 'rgba(5,10,22,0.45)');
-        ctx.fillStyle = vign;
-        ctx.fillRect(0, H * 0.52, W, H * 0.48);
-      }
-
-      // Extra water washes were for empty gradient only; skip when art is showing.
-      if (vignetteScene === 'water' && !drewBg) {
-        const floor = ctx.createLinearGradient(0, H * 0.82, 0, H);
-        floor.addColorStop(0, 'rgba(5, 14, 24, 0)');
-        floor.addColorStop(1, 'rgba(5, 14, 24, 0.5)');
-        ctx.fillStyle = floor;
-        ctx.fillRect(0, H * 0.82, W, H * 0.18);
-
-        const surf = ctx.createLinearGradient(0, 0, 0, H * 0.28);
-        surf.addColorStop(0, 'rgba(30, 110, 190, 0.12)');
-        surf.addColorStop(1, 'rgba(30, 110, 190, 0)');
-        ctx.fillStyle = surf;
-        ctx.fillRect(0, 0, W, H * 0.28);
       }
 
       // Consume any pending teleport (creature dropped at a specific position).
@@ -1471,21 +1444,7 @@ function SideAquarium({ creatures, scene = 'water' }) {
     const src = CLOCKER_BG_BY_SCENE[scene] || CLOCKER_BG_BY_SCENE.water;
 
     const paint = (img) => {
-      if (img && drawCoverImage(ctx, img, W, H)) {
-        if (scene === 'water') {
-          const v = ctx.createLinearGradient(0, H * 0.5, 0, H);
-          v.addColorStop(0, 'rgba(0,0,0,0)');
-          v.addColorStop(1, 'rgba(5,10,22,0.22)');
-          ctx.fillStyle = v;
-          ctx.fillRect(0, H * 0.45, W, H * 0.55);
-        } else {
-          const v = ctx.createLinearGradient(0, H * 0.45, 0, H);
-          v.addColorStop(0, 'rgba(0,0,0,0)');
-          v.addColorStop(1, 'rgba(5,10,22,0.55)');
-          ctx.fillStyle = v;
-          ctx.fillRect(0, H * 0.4, W, H * 0.6);
-        }
-      } else {
+      if (!img || !drawCoverImage(ctx, img, W, H)) {
         const bg = ctx.createLinearGradient(0, 0, 0, H);
         bg.addColorStop(0, '#0a1a30');
         bg.addColorStop(1, '#050e18');
