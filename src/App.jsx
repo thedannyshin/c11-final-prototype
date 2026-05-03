@@ -649,12 +649,25 @@ function useHandTracking(enabled, cameraDeviceId = '') {
         });
         hands.setOptions({
           maxNumHands: 1,
-          modelComplexity: 0,
-          minDetectionConfidence: 0.6,
-          minTrackingConfidence: 0.5,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.65,
+          minTrackingConfidence: 0.6,
         });
         const smoothRef = { x: null, y: null };
-        const SMOOTH = 0.5; // lerp factor: lower = smoother but laggier
+        /** Cursor smoothing: lower α = steadier glow, slightly more lag */
+        const CURSOR_ALPHA = 0.2;
+        /** Ignore single-frame spikes from noisy landmarks */
+        const MAX_CURSOR_JUMP_PX = 40;
+
+        /** Pinch uses smoothed landmarks in normalized image space + hysteresis (not inconsistent px scaling). */
+        const pinchLmRef = { tx: null, ty: null, sx: null, sy: null };
+        const PINCH_LM_ALPHA = 0.42;
+        const PINCH_ENTER_NORM = 0.058;
+        const PINCH_EXIT_NORM = 0.092;
+        let pinchStartFrames = 0;
+        let pinchReleaseFrames = 0;
+        const PINCH_FRAMES_TO_START = 2;
+        const PINCH_FRAMES_TO_RELEASE = 3;
 
         hands.onResults((results) => {
           if (!active) return;
@@ -664,6 +677,9 @@ function useHandTracking(enabled, cameraDeviceId = '') {
             setFingertipPos(null);
             smoothRef.x = null;
             smoothRef.y = null;
+            pinchLmRef.tx = pinchLmRef.ty = pinchLmRef.sx = pinchLmRef.sy = null;
+            pinchStartFrames = 0;
+            pinchReleaseFrames = 0;
             if (prevPinchRef.current) {
               prevPinchRef.current = false;
               pinchCbRef.current.onEnd?.(null);
@@ -673,6 +689,25 @@ function useHandTracking(enabled, cameraDeviceId = '') {
           const lm = results.multiHandLandmarks[0];
           const tip = lm[8];   // index fingertip
           const thumb = lm[4]; // thumb tip
+
+          const pa = PINCH_LM_ALPHA;
+          if (pinchLmRef.tx == null) {
+            pinchLmRef.tx = tip.x;
+            pinchLmRef.ty = tip.y;
+            pinchLmRef.sx = thumb.x;
+            pinchLmRef.sy = thumb.y;
+          } else {
+            pinchLmRef.tx += (tip.x - pinchLmRef.tx) * pa;
+            pinchLmRef.ty += (tip.y - pinchLmRef.ty) * pa;
+            pinchLmRef.sx += (thumb.x - pinchLmRef.sx) * pa;
+            pinchLmRef.sy += (thumb.y - pinchLmRef.sy) * pa;
+          }
+
+          const pinchDistNorm = Math.hypot(pinchLmRef.tx - pinchLmRef.sx, pinchLmRef.ty - pinchLmRef.sy);
+          const pinchGestureOn = prevPinchRef.current
+            ? pinchDistNorm < PINCH_EXIT_NORM
+            : pinchDistNorm < PINCH_ENTER_NORM;
+
           // Mirror x so it matches the user's perspective.
           // Remap a centred 55% band of the camera frame to the full screen so
           // the user doesn't have to move their hand to the very edge of frame.
@@ -682,20 +717,43 @@ function useHandTracking(enabled, cameraDeviceId = '') {
           const normY = Math.max(0, Math.min(1, (tip.y - CAM_PAD_Y) / (1 - 2 * CAM_PAD_Y)));
           const rawX = normX * window.innerWidth;
           const rawY = normY * window.innerHeight;
-          // Exponential smoothing to reduce jitter
-          if (smoothRef.x === null) { smoothRef.x = rawX; smoothRef.y = rawY; }
-          else { smoothRef.x += (rawX - smoothRef.x) * SMOOTH; smoothRef.y += (rawY - smoothRef.y) * SMOOTH; }
+
+          if (smoothRef.x === null) {
+            smoothRef.x = rawX;
+            smoothRef.y = rawY;
+          } else {
+            let nx = smoothRef.x + (rawX - smoothRef.x) * CURSOR_ALPHA;
+            let ny = smoothRef.y + (rawY - smoothRef.y) * CURSOR_ALPHA;
+            const jdx = nx - smoothRef.x;
+            const jdy = ny - smoothRef.y;
+            const jlen = Math.hypot(jdx, jdy);
+            if (jlen > MAX_CURSOR_JUMP_PX && jlen > 0) {
+              const s = MAX_CURSOR_JUMP_PX / jlen;
+              nx = smoothRef.x + jdx * s;
+              ny = smoothRef.y + jdy * s;
+            }
+            smoothRef.x = nx;
+            smoothRef.y = ny;
+          }
           const sx = smoothRef.x;
           const sy = smoothRef.y;
           setFingertipPos({ x: sx, y: sy });
 
-          const dx = (tip.x - thumb.x) * window.innerWidth;
-          const dy = (tip.y - thumb.y) * window.innerHeight;
-          const pinching = Math.sqrt(dx * dx + dy * dy) < 55;
+          if (pinchGestureOn) {
+            pinchStartFrames += 1;
+            pinchReleaseFrames = 0;
+          } else {
+            pinchReleaseFrames += 1;
+            pinchStartFrames = 0;
+          }
 
-          if (pinching && !prevPinchRef.current) pinchCbRef.current.onStart?.({ x: sx, y: sy });
-          if (!pinching && prevPinchRef.current) pinchCbRef.current.onEnd?.({ x: sx, y: sy });
-          prevPinchRef.current = pinching;
+          if (!prevPinchRef.current && pinchStartFrames >= PINCH_FRAMES_TO_START) {
+            prevPinchRef.current = true;
+            pinchCbRef.current.onStart?.({ x: sx, y: sy });
+          } else if (prevPinchRef.current && pinchReleaseFrames >= PINCH_FRAMES_TO_RELEASE) {
+            prevPinchRef.current = false;
+            pinchCbRef.current.onEnd?.({ x: sx, y: sy });
+          }
         });
 
         const videoConstraints = cameraDeviceId
