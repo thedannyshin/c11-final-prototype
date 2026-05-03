@@ -6,6 +6,8 @@ import {
   onValue,
   set,
   update,
+  get,
+  remove,
   serverTimestamp,
   runTransaction,
 } from 'firebase/database';
@@ -20,6 +22,11 @@ const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
 const GAME_ROUND_MS = 2 * 60 * 1000;
 const GAME_POINTS_DRAW = 10;
 const GAME_POINTS_MOVE = 10;
+
+/** Firebase RTDB rooms/{id} deleted if meta.touchedAt missing (legacy) or older than this. */
+const ROOM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+/** Bump meta.touchedAt while any client is connected (server timestamps). */
+const ROOM_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
 const GAME_PHASES = [
   'splash',
@@ -500,9 +507,51 @@ function drawCharacterAt(ctx, character, cx, cy, maxSizePx, angle = 0) {
 // Strokes are stored under rooms/{roomId}/strokes/{strokeId}.
 // Presence is stored under rooms/{roomId}/presence/{clientId}.
 // rooms/{roomId}/settings/background — big-screen scene (water | grass | stars).
+// rooms/{roomId}/meta/touchedAt — session TTL (see ROOM_SESSION_TTL_MS).
 // onValue listeners fire immediately with current data (catch-up) and then
 // on every subsequent change, so no separate readState/writeState is needed.
 // ---------------------------------------------------------------------------
+function coerceFirebaseMillis(ts) {
+  if (typeof ts === 'number' && Number.isFinite(ts)) return ts;
+  return null;
+}
+
+async function pruneExpiredRoom(db, roomId) {
+  const roomRoot = dbRef(db, `rooms/${roomId}`);
+  const metaRef = dbRef(db, `rooms/${roomId}/meta`);
+
+  let metaSnap;
+  try {
+    metaSnap = await get(metaRef);
+  } catch (err) {
+    console.warn('Room session read:', err?.message || err);
+    return;
+  }
+
+  if (metaSnap.exists()) {
+    const touchedAt = coerceFirebaseMillis(metaSnap.val()?.touchedAt);
+    if (touchedAt == null) {
+      await remove(roomRoot);
+      return;
+    }
+    if (Date.now() - touchedAt > ROOM_SESSION_TTL_MS) {
+      await remove(roomRoot);
+    }
+    return;
+  }
+
+  let rootSnap;
+  try {
+    rootSnap = await get(roomRoot);
+  } catch (err) {
+    console.warn('Room session read:', err?.message || err);
+    return;
+  }
+  if (!rootSnap.exists()) return;
+
+  await remove(roomRoot);
+}
+
 function createTransport(roomId) {
   const db = getDatabase(firebaseApp);
   const strokesRef = dbRef(db, `rooms/${roomId}/strokes`);
@@ -571,6 +620,8 @@ function createTransport(roomId) {
         update(gameRef, message.payload);
       } else if (message.type === 'game:set') {
         set(gameRef, message.payload);
+      } else if (message.type === 'room:touch') {
+        update(dbRef(db, `rooms/${roomId}/meta`), { touchedAt: serverTimestamp() });
       }
     },
     subscribe(fn) {
@@ -833,60 +884,90 @@ function useSharedRoom(roomId, client) {
     setRoomBackgroundExplicit(false);
     setGame(defaultGameState());
 
-    const transport = createTransport(roomId);
-    transportRef.current = transport;
+    transportRef.current = null;
 
-    const initial = transport.readState();
-    if (initial?.payload?.strokes) setStrokes(initial.payload.strokes);
-    if (initial?.payload?.participants) setParticipants(initial.payload.participants);
+    let cancelled = false;
+    let transport = null;
+    let unsub = null;
+    let heartbeat = null;
+    let touchClock = null;
 
-    const unsub = transport.subscribe((message) => {
-      if (!message) return;
+    const attachRoom = () => {
+      if (cancelled) return;
+      transport = createTransport(roomId);
+      transportRef.current = transport;
+      transport.send({ type: 'room:touch', clientId: client.clientId });
 
-      if (
-        (message.type === 'character:add' || message.type === 'stroke:add') &&
-        message.clientId !== client.clientId
-      ) {
-        setStrokes((prev) => {
-          if (prev.some((s) => s.id === message.payload?.id)) return prev;
-          return [...prev, message.payload];
-        });
+      const initial = transport.readState();
+      if (initial?.payload?.strokes) setStrokes(initial.payload.strokes);
+      if (initial?.payload?.participants) setParticipants(initial.payload.participants);
+
+      unsub = transport.subscribe((message) => {
+        if (!message) return;
+
+        if (
+          (message.type === 'character:add' || message.type === 'stroke:add') &&
+          message.clientId !== client.clientId
+        ) {
+          setStrokes((prev) => {
+            if (prev.some((s) => s.id === message.payload?.id)) return prev;
+            return [...prev, message.payload];
+          });
+        }
+
+        if (message.type === 'canvas:clear') setStrokes([]);
+
+        if (message.type === 'presence:update' && message.clientId !== client.clientId) {
+          setParticipants((prev) => ({
+            ...prev,
+            [message.clientId]: { ...message.payload, lastSeen: Date.now() },
+          }));
+        }
+
+        if (message.type === 'room:state' && message.payload) {
+          if (Array.isArray(message.payload.strokes)) setStrokes(message.payload.strokes);
+          if (message.payload.participants && typeof message.payload.participants === 'object') {
+            setParticipants(message.payload.participants);
+          }
+          if (message.payload.roomBackground !== undefined) {
+            setRoomBackgroundState(normalizeRoomBackground(message.payload.roomBackground));
+          }
+          if (message.payload.roomBackgroundExplicit !== undefined) {
+            setRoomBackgroundExplicit(!!message.payload.roomBackgroundExplicit);
+          }
+          if (message.payload.game !== undefined) {
+            setGame(normalizeGameState(message.payload.game));
+          }
+        }
+      });
+
+      heartbeat = setInterval(() => {
+        sendPresencePayload(transport);
+      }, 2000);
+
+      touchClock = setInterval(() => {
+        transport.send({ type: 'room:touch', clientId: client.clientId });
+      }, ROOM_TOUCH_INTERVAL_MS);
+    };
+
+    const db = getDatabase(firebaseApp);
+    (async () => {
+      try {
+        await pruneExpiredRoom(db, roomId);
+      } catch (err) {
+        console.warn('Room session prune:', err?.message || err);
       }
-
-      if (message.type === 'canvas:clear') setStrokes([]);
-
-      if (message.type === 'presence:update' && message.clientId !== client.clientId) {
-        setParticipants((prev) => ({
-          ...prev,
-          [message.clientId]: { ...message.payload, lastSeen: Date.now() },
-        }));
-      }
-
-      if (message.type === 'room:state' && message.payload) {
-        if (Array.isArray(message.payload.strokes)) setStrokes(message.payload.strokes);
-        if (message.payload.participants && typeof message.payload.participants === 'object') {
-          setParticipants(message.payload.participants);
-        }
-        if (message.payload.roomBackground !== undefined) {
-          setRoomBackgroundState(normalizeRoomBackground(message.payload.roomBackground));
-        }
-        if (message.payload.roomBackgroundExplicit !== undefined) {
-          setRoomBackgroundExplicit(!!message.payload.roomBackgroundExplicit);
-        }
-        if (message.payload.game !== undefined) {
-          setGame(normalizeGameState(message.payload.game));
-        }
-      }
-    });
-
-    const heartbeat = setInterval(() => {
-      sendPresencePayload(transport);
-    }, 2000);
+      if (cancelled) return;
+      attachRoom();
+    })();
 
     return () => {
-      clearInterval(heartbeat);
+      cancelled = true;
+      if (heartbeat != null) clearInterval(heartbeat);
+      if (touchClock != null) clearInterval(touchClock);
       unsub?.();
-      transport.destroy();
+      transport?.destroy();
+      transportRef.current = null;
     };
   }, [roomId, client.clientId]);
 
@@ -2289,9 +2370,6 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
         <div className="participant-flow-overlay participant-flow-overlay--splash">
           <div className="participant-flow-inner participant-flow-inner--splash-card">
             <ClockItLogo variant="phone" />
-            <p className="participant-flow-wait">
-              Get ready to draw on your phone. During your round, draw quickly and send as many creatures as possible.
-            </p>
             <p className="participant-assigned-team" role="status" aria-live="polite">
               {assignedTeam === 1 || assignedTeam === 2 ? (
                 <>

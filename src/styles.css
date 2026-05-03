@@ -1024,6 +1024,11 @@ p {
   gap: 14px;
 }
 
+.participant-flow-inner--splash-card .participant-assigned-team {
+  margin: 0;
+  max-width: 22rem;
+}
+
 .participant-flow-inner {
   text-align: center;
 }
