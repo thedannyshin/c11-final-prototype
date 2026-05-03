@@ -1975,13 +1975,20 @@ function HostView({ room, shared, onResetRoom }) {
           aria-label="ClockIt — roles and QR for artists"
         >
           <div className="host-flow-inner host-flow-inner--splash-card">
-            <ClockItLogo />
-            <div className="host-flow-splash-copy">
-              <p className="host-flow-splash-lead host-flow-splash-lead--head">2 teams · 2 players each</p>
-              <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
-              <p className="host-flow-splash-lead">Artist → scan the QR below</p>
+            <div className="host-flow-splash-hero">
+              <div className="host-flow-splash-hero-main">
+                <ClockItLogo />
+                <div className="host-flow-splash-copy">
+                  <p className="host-flow-splash-lead host-flow-splash-lead--head">2 teams · 2 players each</p>
+                  <p className="host-flow-splash-lead">Clocker → point to move, pinch to grab</p>
+                  <p className="host-flow-splash-lead">Artist → scan the QR to join</p>
+                </div>
+              </div>
+              <div className="host-flow-splash-qr" aria-label="QR code to join as artist">
+                <QRCodeSVG value={joinUrl} size={118} bgColor="#ffffff" fgColor="#000000" />
+                <span className="host-flow-splash-qr-hint">Scan</span>
+              </div>
             </div>
-            <QRCodeSVG value={joinUrl} size={140} bgColor="transparent" fgColor="#ffffff" />
             <div className="host-flow-scene">
               <p className="host-flow-scene-heading" id="host-splash-scene-label">
                 Pick your stage
