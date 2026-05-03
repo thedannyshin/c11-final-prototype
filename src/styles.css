@@ -691,9 +691,9 @@ p {
   align-items: center;
   justify-content: center;
   padding: 20px 16px;
-  background: rgba(5, 14, 24, 0.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(5, 14, 24, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .participant-howto-panel {
@@ -701,11 +701,15 @@ p {
   max-height: min(88dvh, 640px);
   overflow: auto;
   padding: 20px 22px 22px;
-  border-radius: 20px;
-  background: #f4f1e8;
-  color: #143d2e;
-  border: 2px solid #1a4d3a;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+  border-radius: 18px;
+  background: rgba(5, 14, 28, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(0, 212, 255, 0.06),
+    0 24px 48px rgba(0, 0, 0, 0.45);
   outline: none;
 }
 
@@ -725,20 +729,20 @@ p {
 .participant-howto-welcome {
   display: block;
   font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #1a4d3a;
-  opacity: 0.85;
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .participant-howto-clockit {
   display: block;
-  font-size: 1.65rem;
+  margin-top: 4px;
+  font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #0f3326;
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .participant-howto-close {
@@ -750,30 +754,33 @@ p {
   border: none;
   border-radius: 12px;
   background: transparent;
-  color: #1a4d3a;
+  color: rgba(255, 255, 255, 0.5);
   font-size: 1.75rem;
   line-height: 1;
   cursor: pointer;
   display: grid;
   place-items: center;
+  transition: color 0.15s, background 0.15s;
 }
 
 .participant-howto-close:hover {
-  background: rgba(26, 77, 58, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .participant-howto-close:focus {
-  outline: 2px solid #1a4d3a;
-  outline-offset: 2px;
+  outline: none;
+  color: rgba(0, 212, 255, 0.95);
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.25);
 }
 
 .participant-howto-subtitle {
   margin: 0 0 14px;
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #143d2e;
+  color: rgba(0, 212, 255, 0.85);
 }
 
 .participant-howto-list {
@@ -783,12 +790,16 @@ p {
   flex-direction: column;
   gap: 12px;
   font-size: 0.9375rem;
-  line-height: 1.45;
-  color: #143d2e;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .participant-howto-list li {
   padding-left: 0.25rem;
+}
+
+.participant-howto-list li::marker {
+  color: rgba(0, 212, 255, 0.65);
 }
 
 .participant-scene-wrap {
