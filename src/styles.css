@@ -279,21 +279,6 @@ p {
   }
 }
 
-/* Top HUD total — same motion language as +points float (rise + scale), then settles */
-@keyframes play-hud-score-rise {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-
-  40% {
-    transform: translate3d(0, -0.22em, 0) scale(1.12);
-  }
-
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
 .points-pop {
   position: fixed;
   left: 50%;
@@ -323,6 +308,44 @@ p {
   letter-spacing: 0.06em;
   color: rgba(255, 255, 255, 0.96);
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
+}
+
+/* Triple “bam” scale on play HUD total when points go up (host + participant). */
+@keyframes play-score-total-bump {
+  0% {
+    transform: scale(1);
+  }
+
+  14% {
+    transform: scale(1.2);
+  }
+
+  28% {
+    transform: scale(1);
+  }
+
+  42% {
+    transform: scale(1.14);
+  }
+
+  56% {
+    transform: scale(1);
+  }
+
+  72% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.clocker-play-score-num.play-score-total--bump,
+.participant-play-score-num.play-score-total--bump {
+  display: inline-block;
+  transform-origin: center center;
+  animation: play-score-total-bump 0.52s cubic-bezier(0.34, 1.45, 0.64, 1);
 }
 
 .clocker-play-active {
@@ -374,17 +397,11 @@ p {
 }
 
 .clocker-play-score-num {
-  display: inline-block;
   font-size: clamp(1.75rem, 5vw, 3.75rem);
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: rgba(255, 255, 255, 0.98);
-  transform-origin: center center;
-}
-
-.clocker-play-score-num--bump {
-  animation: play-hud-score-rise 0.95s ease-out;
 }
 
 .clocker-play-timer {
@@ -1358,17 +1375,11 @@ p {
 }
 
 .participant-play-score-num {
-  display: inline-block;
   font-size: clamp(1.85rem, 5.8vw, 4rem);
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: rgba(255, 255, 255, 0.98);
-  transform-origin: center center;
-}
-
-.participant-play-score-num--bump {
-  animation: play-hud-score-rise 0.95s ease-out;
 }
 
 .participant-play-timer {

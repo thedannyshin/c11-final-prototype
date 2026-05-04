@@ -117,25 +117,6 @@ function getCountdownDisplay(game) {
   return { line1: 'Go!', line2: null };
 }
 
-/** When the active team’s total score goes up during a play round, bump so the HUD can replay the rise pop. */
-function usePlayHudScoreBumpKey(phase, team1Score, team2Score) {
-  const ref = useRef({ phase: null, t1: 0, t2: 0 });
-  const [bumpKey, setBumpKey] = useState(0);
-  useEffect(() => {
-    if (phase !== 'team1' && phase !== 'team2') {
-      ref.current = { phase, t1: team1Score, t2: team2Score };
-      setBumpKey(0);
-      return;
-    }
-    const prev = ref.current;
-    const s = phase === 'team1' ? team1Score : team2Score;
-    const prevS = prev.phase === phase ? (phase === 'team1' ? prev.t1 : prev.t2) : null;
-    if (prevS != null && s > prevS) setBumpKey((k) => k + 1);
-    ref.current = { phase, t1: team1Score, t2: team2Score };
-  }, [phase, team1Score, team2Score]);
-  return bumpKey;
-}
-
 function getWinnerPhrase(team1Score, team2Score) {
   if (team1Score === team2Score) return "It's a tie!";
   return team1Score > team2Score ? 'Team 1 wins!' : 'Team 2 wins!';
@@ -1962,6 +1943,24 @@ function DrawingPad({ onCommit, overlay = null }) {
   );
 }
 
+/** When the play-HUD total for the active round goes up, bump `nonce` so we can replay the hit animation. */
+function usePlayHudScoreBump(phase, team1Score, team2Score) {
+  const active = phase === 'team1' || phase === 'team2';
+  const displayed = phase === 'team1' ? team1Score : phase === 'team2' ? team2Score : null;
+  const scoreBumpRef = useRef({ phase: null, score: null });
+  const [bumpNonce, setBumpNonce] = useState(0);
+  useEffect(() => {
+    if (!active || displayed == null) return;
+    const prev = scoreBumpRef.current;
+    const sameRound = prev.phase === phase;
+    if (sameRound && typeof prev.score === 'number' && displayed > prev.score) {
+      setBumpNonce((n) => n + 1);
+    }
+    scoreBumpRef.current = { phase, score: displayed };
+  }, [active, phase, displayed]);
+  return { displayedScore: displayed, bumpNonce };
+}
+
 // ---------------------------------------------------------------------------
 // Views
 // ---------------------------------------------------------------------------
@@ -2340,8 +2339,12 @@ function ClockerView({ room, shared, onResetRoom }) {
   const g = shared.game;
   const cd = getCountdownDisplay(g);
   const showPlayHud = g.phase === 'team1' || g.phase === 'team2';
-  const playHudScoreBumpKey = usePlayHudScoreBumpKey(g.phase, g.team1Score, g.team2Score);
   const pinchPlayHint = playHintLabels(displayScene);
+  const { displayedScore: playHudScore, bumpNonce: playHudScoreBump } = usePlayHudScoreBump(
+    g.phase,
+    g.team1Score,
+    g.team2Score,
+  );
 
   return (
     <div
@@ -2489,10 +2492,10 @@ function ClockerView({ room, shared, onResetRoom }) {
             <div className="clocker-play-scores">
               <div className="clocker-play-score-block is-active">
                 <span
-                  key={playHudScoreBumpKey}
-                  className={`clocker-play-score-num${playHudScoreBumpKey > 0 ? ' clocker-play-score-num--bump' : ''}`}
+                  key={`clocker-play-score-${playHudScoreBump}`}
+                  className={`clocker-play-score-num${playHudScoreBump > 0 ? ' play-score-total--bump' : ''}`}
                 >
-                  {g.phase === 'team1' ? g.team1Score : g.team2Score}
+                  {playHudScore ?? 0}
                 </span>
               </div>
             </div>
@@ -2637,8 +2640,12 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
   const drawPlayHint = playHintLabels(scene);
   const bgUrl = CLOCKER_BG_BY_SCENE[scene] ?? CLOCKER_BG_BY_SCENE.water;
   const gm = shared.game;
+  const { displayedScore: playHudScore, bumpNonce: playHudScoreBump } = usePlayHudScoreBump(
+    gm.phase,
+    gm.team1Score,
+    gm.team2Score,
+  );
   const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
-  const playHudScoreBumpKey = usePlayHudScoreBumpKey(gm.phase, gm.team1Score, gm.team2Score);
   const assignedTeam = useMemo(
     () => computeAutoParticipantTeam(clientId, shared.participants),
     [clientId, shared.participants],
@@ -2751,12 +2758,10 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
               </p>
               <div className="participant-play-score-wrap">
                 <span
-                  key={playHudScoreBumpKey}
-                  className={`participant-play-score-num${
-                    playHudScoreBumpKey > 0 ? ' participant-play-score-num--bump' : ''
-                  }`}
+                  key={`participant-play-score-${playHudScoreBump}`}
+                  className={`participant-play-score-num${playHudScoreBump > 0 ? ' play-score-total--bump' : ''}`}
                 >
-                  {gm.phase === 'team1' ? gm.team1Score : gm.team2Score}
+                  {playHudScore ?? 0}
                 </span>
               </div>
               {gm.roundEndAt ? (
