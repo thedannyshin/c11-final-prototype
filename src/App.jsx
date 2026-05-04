@@ -22,8 +22,15 @@ const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
 const GAME_ROUND_MS = 2 * 60 * 1000;
 /** If time is up but the Clocker never advanced phase (tab closed / lost), participant returns to join home after this wait. */
 const PARTICIPANT_STUCK_ROUND_GRACE_MS = 5000;
-const GAME_POINTS_DRAW = 10;
+const GAME_POINTS_DRAW_MULTI_COLOR = 10;
+const GAME_POINTS_DRAW_SINGLE_COLOR = 5;
 const GAME_POINTS_MOVE = 10;
+
+/** 5 pts for 1 color, 10 pts for 2+ colors. */
+function drawPointsForCharacter(character) {
+  const colors = new Set((character.paths || []).map((p) => p.color).filter(Boolean));
+  return colors.size >= 2 ? GAME_POINTS_DRAW_MULTI_COLOR : GAME_POINTS_DRAW_SINGLE_COLOR;
+}
 /** Relocate to side panel but outside the illustrated “hot” zone (tank / grass patch). */
 const GAME_POINTS_MOVE_SIDE_OUTSIDE = 5;
 
@@ -1290,17 +1297,19 @@ function useSharedRoom(roomId, client) {
         payload: character,
       });
       const g = gameRef.current;
+      const delta = drawPointsForCharacter(character);
       if (g.phase === 'team1') {
         transportRef.current?.send({
           type: 'game:increment',
-          payload: { team: 1, delta: GAME_POINTS_DRAW },
+          payload: { team: 1, delta },
         });
       } else if (g.phase === 'team2') {
         transportRef.current?.send({
           type: 'game:increment',
-          payload: { team: 2, delta: GAME_POINTS_DRAW },
+          payload: { team: 2, delta },
         });
       }
+      return delta;
     },
     clearCanvas: sendCanvasClear,
     awardRelocatePoints(delta = GAME_POINTS_MOVE) {
@@ -2671,6 +2680,7 @@ function ClockerView({ room, shared, onResetRoom }) {
 function ParticipantView({ shared, clientName, setClientName, clientColor, clientId, onExitToJoinHome }) {
   const [, forceClockTick] = useState(0);
   const [sendPointsPop, setSendPointsPop] = useState(0);
+  const [lastDrawDelta, setLastDrawDelta] = useState(GAME_POINTS_DRAW_MULTI_COLOR);
   const stuckExitDoneRef = useRef(false);
   const scene = normalizeRoomBackground(shared.roomBackground);
   const drawPlayHint = playHintLabels(scene);
@@ -2851,7 +2861,8 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
           ) : (
             <DrawingPad
               onCommit={(character) => {
-                shared.addCharacter(character);
+                const delta = shared.addCharacter(character);
+                setLastDrawDelta(delta ?? GAME_POINTS_DRAW_MULTI_COLOR);
                 setSendPointsPop((n) => n + 1);
               }}
               overlay={
@@ -2863,7 +2874,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
           )}
           {myTurnToDraw && sendPointsPop > 0 ? (
             <span key={sendPointsPop} className="points-pop points-pop--participant" aria-hidden>
-              +{GAME_POINTS_DRAW}
+              +{lastDrawDelta}
             </span>
           ) : null}
         </>
