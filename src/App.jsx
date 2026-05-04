@@ -148,23 +148,30 @@ function mainAquariumWidthPx() {
   return window.innerWidth * (1 - SHOWCASE_WIDTH_FRAC);
 }
 
+/** Shared starfield asset (main tank + side column until a dedicated side portrait exists). */
+const CLOCKER_BG_STARS_SRC = '/bg-starry.jpg';
+
 /** Clocker (big screen) background art in /public — all scenes are 1920×1240 (~1.55:1) for consistent sizing. */
 const CLOCKER_BG_BY_SCENE = {
   water: '/bg-water.png',
   grass: '/bg-grass.png',
-  stars: '/bg-starry.jpg',
+  stars: CLOCKER_BG_STARS_SRC,
 };
-/** Side showcase column art (portrait-friendly); main tank still uses CLOCKER_BG_BY_SCENE. */
+/**
+ * Side showcase column art in /public — each scene is drawn with the same cover-fit + fallback
+ * as the others (see SideAquarium). Water/grass use portrait side assets; stars reuses the
+ * main starfield so one network fetch fills both panes.
+ */
 const CLOCKER_SIDE_BG_BY_SCENE = {
   water: '/side-bg-water.png',
   grass: '/side-bg-grass.png',
-  stars: '/bg-starry.jpg',
+  stars: CLOCKER_BG_STARS_SRC,
 };
-/** Letterbox fill behind contain-fit side art (matches each asset’s flat background). */
-const SIDE_PANEL_LETTERBOX_BY_SCENE = {
-  water: '#c8e4f5',
-  grass: '#ffffff',
-  stars: '#050a14',
+/** Creature drop-shadow on the side column — tuned per stage like the backgrounds. */
+const SIDE_PANEL_CREATURE_GLOW_BY_SCENE = {
+  water: 'rgba(0, 212, 255, 0.45)',
+  grass: 'rgba(52, 211, 153, 0.5)',
+  stars: 'rgba(199, 210, 254, 0.55)',
 };
 /** Looping ambience per big-screen scene (files in /public). */
 const CLOCKER_MUSIC_BY_SCENE = {
@@ -369,20 +376,6 @@ function drawCoverImage(ctx, img, destW, destH) {
   const iw = img.naturalWidth;
   const ih = img.naturalHeight;
   const scale = Math.max(destW / iw, destH / ih);
-  const dw = iw * scale;
-  const dh = ih * scale;
-  const dx = (destW - dw) / 2;
-  const dy = (destH - dh) / 2;
-  ctx.drawImage(img, dx, dy, dw, dh);
-  return true;
-}
-
-/** Contain-fit (full image visible, letterboxing). */
-function drawContainImage(ctx, img, destW, destH) {
-  if (!img?.naturalWidth) return false;
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
-  const scale = Math.min(destW / iw, destH / ih);
   const dw = iw * scale;
   const dh = ih * scale;
   const dx = (destW - dw) / 2;
@@ -1468,15 +1461,15 @@ function SideAquarium({ creatures, scene = 'water' }) {
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
+    const sceneKey = normalizeRoomBackground(scene);
     const src =
-      CLOCKER_SIDE_BG_BY_SCENE[scene] || CLOCKER_SIDE_BG_BY_SCENE.water;
-    const letterbox =
-      SIDE_PANEL_LETTERBOX_BY_SCENE[scene] || SIDE_PANEL_LETTERBOX_BY_SCENE.water;
+      CLOCKER_SIDE_BG_BY_SCENE[sceneKey] ?? CLOCKER_SIDE_BG_BY_SCENE.water;
+    const creatureGlow =
+      SIDE_PANEL_CREATURE_GLOW_BY_SCENE[sceneKey] ??
+      SIDE_PANEL_CREATURE_GLOW_BY_SCENE.water;
 
     const paint = (img) => {
-      ctx.fillStyle = letterbox;
-      ctx.fillRect(0, 0, W, H);
-      if (!img || !drawContainImage(ctx, img, W, H)) {
+      if (!img || !drawCoverImage(ctx, img, W, H)) {
         const bg = ctx.createLinearGradient(0, 0, 0, H);
         bg.addColorStop(0, '#0a1a30');
         bg.addColorStop(1, '#050e18');
@@ -1493,7 +1486,7 @@ function SideAquarium({ creatures, scene = 'water' }) {
         const cx = Math.max(size / 2, Math.min(W - size / 2, creature.dropX ?? W / 2));
         const cy = Math.max(size / 2, Math.min(H - size / 2, creature.dropY ?? H / 2));
         ctx.save();
-        ctx.shadowColor = 'rgba(0, 212, 255, 0.45)';
+        ctx.shadowColor = creatureGlow;
         ctx.shadowBlur = 22;
         drawCharacterAt(ctx, creature, cx, cy, size, 0);
         ctx.restore();
