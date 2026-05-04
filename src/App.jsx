@@ -15,7 +15,7 @@ import { firebaseApp } from './firebase.js';
 
 const CANVAS_W = 1200;
 const CANVAS_H = 700;
-const DEFAULT_COLOR = '#00D4FF';
+const DEFAULT_COLOR = '#FFFFFF';
 const COLORS = ['#FFFFFF', '#00D4FF', '#F43F5E', '#10B981', '#FBBF24', '#A78BFA'];
 const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
 
