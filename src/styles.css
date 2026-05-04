@@ -413,7 +413,7 @@ p {
 }
 
 .clocker-play-score-num {
-  font-size: clamp(1.75rem, 5vw, 3.75rem);
+  font-size: clamp(3rem, 10vw, 7rem);
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   line-height: 1;
