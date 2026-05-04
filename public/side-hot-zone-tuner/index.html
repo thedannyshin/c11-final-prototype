@@ -194,6 +194,16 @@
         color: #94a3b8;
         width: 100%;
       }
+      label.fit-toggle {
+        gap: 10px;
+        font-weight: 600;
+        color: #e2e8f0;
+      }
+      label.fit-toggle input {
+        width: 18px;
+        height: 18px;
+        accent-color: #22c55e;
+      }
     </style>
   </head>
   <body>
@@ -201,9 +211,10 @@
       <h1>Side panel hot zone tuner</h1>
       <p class="sub">
         <strong>Aquarium / stars:</strong> drag the four handles — copy into <code>SIDE_PANEL_UV_HOT_ZONE</code>.
-        <strong>Grass:</strong> irregular blob — use sliders so the green overlay matches the art, then copy the four
-        <code>GRASS_MASK_*</code> constants into <code>App.jsx</code> (same names as in the game). Open on your Vercel
-        URL as <code>/side-hot-zone-tuner/</code>.
+        <strong>Grass:</strong> the game classifies <em>paper vs paint</em> (same rules as the sliders); tune until the
+        green overlay matches the blob, then copy the four <code>GRASS_MASK_*</code> lines into <code>App.jsx</code>.
+        Use <strong>Show full artwork</strong> below to preview the whole PNG; the real Clocker side panel still uses
+        <strong>cover</strong> (cropped to fill). Open on your site as <code>/side-hot-zone-tuner/</code>.
       </p>
     </header>
     <div class="toolbar">
@@ -215,6 +226,10 @@
         Panel width
         <input type="range" id="panelFrac" min="0.15" max="0.5" step="0.01" value="0.3" />
         <span id="panelFracLabel"></span>
+      </label>
+      <label class="fit-toggle">
+        <input type="checkbox" id="fitContain" checked />
+        Show full artwork (contain)
       </label>
       <button type="button" class="secondary" id="btnReset">Reset scene defaults</button>
       <button type="button" id="btnCopy">Copy snippet</button>
@@ -280,8 +295,16 @@
         GRASS_MASK_G_LEAD_B: 5,
       };
 
-      function sidePanelCoverTransform(panelW, panelH, iw, ih) {
-        const scale = Math.max(panelW / iw, panelH / ih);
+      function getPreviewFit() {
+        return document.getElementById('fitContain')?.checked ? 'contain' : 'cover';
+      }
+
+      /** Same math as the game side panel when fit is <code>cover</code>. */
+      function sidePanelFitTransform(panelW, panelH, iw, ih, fit) {
+        const scale =
+          fit === 'contain'
+            ? Math.min(panelW / iw, panelH / ih)
+            : Math.max(panelW / iw, panelH / ih);
         const dw = iw * scale;
         const dh = ih * scale;
         const dx = (panelW - dw) / 2;
@@ -289,16 +312,34 @@
         return { scale, dx, dy };
       }
 
-      function panelPxToUv(px, py, panelW, panelH, iw, ih) {
-        const { scale, dx, dy } = sidePanelCoverTransform(panelW, panelH, iw, ih);
+      function panelPxToUv(px, py, panelW, panelH, iw, ih, fit) {
+        const { scale, dx, dy } = sidePanelFitTransform(panelW, panelH, iw, ih, fit);
         const u = (px - dx) / scale / iw;
         const v = (py - dy) / scale / ih;
         return { u, v };
       }
 
-      function uvToPanelPx(u, v, panelW, panelH, iw, ih) {
-        const { scale, dx, dy } = sidePanelCoverTransform(panelW, panelH, iw, ih);
+      function uvToPanelPx(u, v, panelW, panelH, iw, ih, fit) {
+        const { scale, dx, dy } = sidePanelFitTransform(panelW, panelH, iw, ih, fit);
         return { x: u * iw * scale + dx, y: v * ih * scale + dy };
+      }
+
+      const LETTERBOX_BY_SCENE = {
+        water: '#c8e4f5',
+        grass: '#ffffff',
+        stars: '#0a0f18',
+      };
+
+      function drawImageFit(ctx, img, destW, destH, fit, letterboxColor) {
+        const iw = img.naturalWidth;
+        const ih = img.naturalHeight;
+        if (!iw) return;
+        const { scale, dx, dy } = sidePanelFitTransform(destW, destH, iw, ih, fit);
+        const dw = iw * scale;
+        const dh = ih * scale;
+        ctx.fillStyle = letterboxColor;
+        ctx.fillRect(0, 0, destW, destH);
+        ctx.drawImage(img, dx, dy, dw, dh);
       }
 
       function readGrassParams() {
@@ -381,18 +422,6 @@
         });
       }
 
-      function drawCover(ctx, img, destW, destH) {
-        const iw = img.naturalWidth;
-        const ih = img.naturalHeight;
-        if (!iw) return;
-        const scale = Math.max(destW / iw, destH / ih);
-        const dw = iw * scale;
-        const dh = ih * scale;
-        const dx = (destW - dw) / 2;
-        const dy = (destH - dh) / 2;
-        ctx.drawImage(img, dx, dy, dw, dh);
-      }
-
       function syncPanelWidth() {
         const frac = parseFloat(panelFracEl.value, 10);
         panelFracLabel.textContent = `${Math.round(frac * 100)}% (Clocker default 30%)`;
@@ -435,10 +464,15 @@
         cv.width = panelW;
         cv.height = panelH;
         const ctx = cv.getContext('2d');
-        ctx.fillStyle = '#050a14';
-        ctx.fillRect(0, 0, panelW, panelH);
+        const fit = getPreviewFit();
         const im = images[scene];
-        if (im?.naturalWidth) drawCover(ctx, im, panelW, panelH);
+        const lb = LETTERBOX_BY_SCENE[scene] ?? '#050a14';
+        if (im?.naturalWidth) {
+          drawImageFit(ctx, im, panelW, panelH, fit, lb);
+        } else {
+          ctx.fillStyle = '#050a14';
+          ctx.fillRect(0, 0, panelW, panelH);
+        }
 
         handlesEl.style.display = scene === 'grass' ? 'none' : 'block';
 
@@ -453,7 +487,7 @@
               if (!grassMaskCache.mask[j * grassMaskCache.w + i]) continue;
               const u = (i + 0.5) / grassMaskCache.w;
               const v = (j + 0.5) / grassMaskCache.h;
-              const pt = uvToPanelPx(u, v, panelW, panelH, dim.w, dim.h);
+              const pt = uvToPanelPx(u, v, panelW, panelH, dim.w, dim.h, fit);
               ctx.fillStyle = 'rgba(34, 197, 94, 0.35)';
               ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
             }
@@ -464,8 +498,8 @@
           grassMaskCache = null;
           maskStat.textContent = '';
           const dim = INTRINSIC[scene];
-          const p0 = uvToPanelPx(zone.u0, zone.v0, panelW, panelH, dim.w, dim.h);
-          const p1 = uvToPanelPx(zone.u1, zone.v1, panelW, panelH, dim.w, dim.h);
+          const p0 = uvToPanelPx(zone.u0, zone.v0, panelW, panelH, dim.w, dim.h, fit);
+          const p1 = uvToPanelPx(zone.u1, zone.v1, panelW, panelH, dim.w, dim.h, fit);
           const x = Math.min(p0.x, p1.x);
           const y = Math.min(p0.y, p1.y);
           const rw = Math.abs(p1.x - p0.x);
@@ -478,15 +512,15 @@
           ctx.fillRect(x, y, rw, rh);
           ctx.strokeRect(x, y, rw, rh);
           ctx.restore();
-          placeHandles(panelW, panelH, dim);
+          placeHandles(panelW, panelH, dim, fit);
         }
         updateSnippet();
       }
 
-      function placeHandles(panelW, panelH, dim) {
+      function placeHandles(panelW, panelH, dim, fit) {
         handlesEl.innerHTML = '';
         for (const { key, u, v } of cornerKeys()) {
-          const p = uvToPanelPx(zone[u], zone[v], panelW, panelH, dim.w, dim.h);
+          const p = uvToPanelPx(zone[u], zone[v], panelW, panelH, dim.w, dim.h, fit);
           const h = document.createElement('div');
           h.className = 'handle';
           h.dataset.key = key;
@@ -496,17 +530,25 @@
         }
       }
 
+      function previewFitHint() {
+        return getPreviewFit()
+          ? ' Preview: contain (full art + letterbox). Clocker side panel still uses cover (fills column, may crop).'
+          : ' Preview: cover (matches Clocker side column — may crop the PNG).';
+      }
+
       function updateSnippet() {
+        const fitNote = previewFitHint();
         if (scene === 'grass') {
           const p = readGrassParams();
           exportTitle.textContent = 'Paste into App.jsx (replace the four GRASS_MASK_* constants)';
           exportHint.textContent =
-            'Grass uses a raster mask from side-bg-grass.png — not the UV rectangle. Match the green overlay to your blob.';
+            'Grass: raster mask from side-bg-grass.png (white paper vs green paint — same rules as these sliders). Match the green overlay to your blob.' +
+            fitNote;
           snippetEl.textContent = `const GRASS_MASK_BG_CH = ${p.GRASS_MASK_BG_CH};\nconst GRASS_MASK_SUM_MIN = ${p.GRASS_MASK_SUM_MIN};\nconst GRASS_MASK_G_LEAD_R = ${p.GRASS_MASK_G_LEAD_R};\nconst GRASS_MASK_G_LEAD_B = ${p.GRASS_MASK_G_LEAD_B};`;
         } else {
           exportTitle.textContent = 'Paste into App.jsx (replace the matching scene in SIDE_PANEL_UV_HOT_ZONE)';
           exportHint.textContent =
-            'Handles: top-left = (u₀,v₀), top-right = (u₁,v₀), bottom-right = (u₁,v₁), bottom-left = (u₀,v₁).';
+            'Handles: top-left = (u₀,v₀), top-right = (u₁,v₀), bottom-right = (u₁,v₁), bottom-left = (u₀,v₁).' + fitNote;
           const z = zone;
           snippetEl.textContent = `  ${scene}: { u0: ${z.u0.toFixed(3)}, v0: ${z.v0.toFixed(3)}, u1: ${z.u1.toFixed(3)}, v1: ${z.v1.toFixed(3)} },`;
         }
@@ -519,7 +561,8 @@
         const px = clientX - rect.left;
         const py = clientY - rect.top;
         const dim = INTRINSIC[scene];
-        let { u, v } = panelPxToUv(px, py, panelW, panelH, dim.w, dim.h);
+        const fit = getPreviewFit();
+        let { u, v } = panelPxToUv(px, py, panelW, panelH, dim.w, dim.h, fit);
         u = Math.min(1, Math.max(0, u));
         v = Math.min(1, Math.max(0, v));
 
@@ -588,6 +631,10 @@
 
       panelFracEl.addEventListener('input', () => {
         syncPanelWidth();
+        paint();
+      });
+
+      document.getElementById('fitContain').addEventListener('change', () => {
         paint();
       });
 
