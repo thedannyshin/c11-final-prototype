@@ -1947,11 +1947,29 @@ function DrawingPad({ onCommit, overlay = null }) {
 
 /** Home / splash — bottom-left credits (last name alphabetical). */
 function HomeScreenCredits() {
+  const people = [
+    { name: 'Karen-Happuch Henneh', url: 'https://www.linkedin.com/in/karen-happuch-p-henneh-03a729191/' },
+    { name: 'Uyen Phan',            url: 'https://www.linkedin.com/in/uyentphan/' },
+    { name: 'Kyle Samonte',         url: 'https://www.linkedin.com/in/kyle-samonte/' },
+    { name: 'Danny Shin',           url: 'https://www.linkedin.com/in/hyunwooshin/' },
+  ];
   return (
     <footer className="home-screen-credits">
       <span className="home-screen-credits-heading">Credits</span>
       <span className="home-screen-credits-list">
-        Karen-Happuch Henneh · Uyen Phan · Kyle Samonte · Danny Shin
+        {people.map((p, i) => (
+          <React.Fragment key={p.url}>
+            {i > 0 && ' · '}
+            <a
+              className="home-screen-credits-link"
+              href={p.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {p.name}
+            </a>
+          </React.Fragment>
+        ))}
       </span>
     </footer>
   );

@@ -486,6 +486,18 @@ p {
   white-space: nowrap;
 }
 
+.home-screen-credits-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+  pointer-events: auto;
+}
+
+.home-screen-credits-link:hover {
+  text-decoration-color: rgba(255, 255, 255, 0.9);
+}
+
 .clocker-flow-inner--splash-card {
   pointer-events: auto;
   width: 100%;
