@@ -176,7 +176,7 @@ const CLOCKER_BG_BY_SCENE = {
 const CLOCKER_SIDE_BG_BY_SCENE = {
   water: '/side-bg-water.png',
   grass: '/side-bg-grass.png',
-  stars: CLOCKER_BG_STARS_SRC,
+  stars: '/side-bg-stars.png',
 };
 /** Creature drop-shadow on the side column — tuned per stage like the backgrounds. */
 const SIDE_PANEL_CREATURE_GLOW_BY_SCENE = {
@@ -188,7 +188,7 @@ const SIDE_PANEL_CREATURE_GLOW_BY_SCENE = {
 const SIDE_PANEL_INTRINSIC_PX = {
   water: { w: 580, h: 1024 },
   grass: { w: 580, h: 1024 },
-  stars: { w: 1920, h: 1240 },
+  stars: { w: 579, h: 1024 },
 };
 /**
  * Hot zones in normalised image UV space (0–1) for side-panel drops — matches cover-fit art.
