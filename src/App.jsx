@@ -427,14 +427,6 @@ function clampSidePanelDropPx(sceneKey, panelPx, panelPy, panelW, panelH) {
   return uvToPanelPx(c.u, c.v, panelW, panelH, dim.w, dim.h);
 }
 
-/** While dragging onto the side column, draw the creature clamped inside the scene hot zone. */
-function clampScreenPosForSideDrag(sceneKey, screenX, screenY, mainW, panelH) {
-  const panelW = window.innerWidth - mainW;
-  if (screenX <= mainW || panelW <= 0) return { x: screenX, y: screenY };
-  const { x, y } = clampSidePanelDropPx(sceneKey, screenX - mainW, screenY, panelW, panelH);
-  return { x: mainW + x, y };
-}
-
 /** Looping ambience per big-screen scene (files in /public). */
 const CLOCKER_MUSIC_BY_SCENE = {
   water: '/under-the-sea.mp3',
@@ -2213,15 +2205,6 @@ function ClockerView({ room, shared, onResetRoom }) {
   // ── Hand tracking ─────────────────────────────────────────────────────────
   const { fingertipPos, pinchCbRef } = useHandTracking(handEnabled, cameraDeviceId);
 
-  const heldDrawPos = useMemo(() => {
-    if (!fingertipPos || !heldCreature) return fingertipPos;
-    const mw = mainAquariumWidthPx();
-    const H = window.innerHeight;
-    if (fingertipPos.x <= mw) return fingertipPos;
-    const sceneKey = normalizeRoomBackground(displayScene);
-    return clampScreenPosForSideDrag(sceneKey, fingertipPos.x, fingertipPos.y, mw, H);
-  }, [fingertipPos, heldCreature, displayScene]);
-
   // Keep heldPos in sync with the fingertip while dragging.
   useEffect(() => {
     if (!heldIdRef.current || !fingertipPos) return;
@@ -2651,7 +2634,7 @@ function ClockerView({ room, shared, onResetRoom }) {
       </div>
       ) : null}
 
-      <HeldCreatureOverlay creature={heldCreature} pos={heldDrawPos} />
+      <HeldCreatureOverlay creature={heldCreature} pos={fingertipPos} />
 
       {fingertipPos && handEnabled && (
         <div
