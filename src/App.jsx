@@ -184,12 +184,51 @@ const SIDE_PANEL_INTRINSIC_PX = {
 /**
  * Hot zones in normalised image UV space (0–1) for side-panel drops — matches cover-fit art.
  * Water/grass tuned for 580×1024 portrait side assets; stars = full frame.
+ * Debug overlay: add ?sideHotZone=1 to the Clocker URL, adjust these values, screenshot / send back.
  */
 const SIDE_PANEL_UV_HOT_ZONE = {
-  water: { u0: 0.1, v0: 0.36, u1: 0.9, v1: 0.97 },
-  grass: { u0: 0.14, v0: 0.28, u1: 0.86, v1: 0.84 },
+  /* v0 must include the tank lid / top glass — too high a v0 blocks moving above the tank body */
+  water: { u0: 0.08, v0: 0.18, u1: 0.92, v1: 0.97 },
+  grass: { u0: 0.12, v0: 0.22, u1: 0.88, v1: 0.86 },
   stars: { u0: 0, v0: 0, u1: 1, v1: 1 },
 };
+
+function shouldDrawSideHotZoneDebug() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('sideHotZone');
+    return v === '1' || v === 'true' || v === 'yes';
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Semi-transparent overlay so UV bounds can be tuned against the side art. */
+function drawSidePanelHotZoneOverlay(ctx, sceneKey, panelW, panelH) {
+  const z = SIDE_PANEL_UV_HOT_ZONE[sceneKey];
+  if (!z || (z.u0 === 0 && z.v0 === 0 && z.u1 === 1 && z.v1 === 1)) return;
+  const dim = SIDE_PANEL_INTRINSIC_PX[sceneKey] ?? SIDE_PANEL_INTRINSIC_PX.water;
+  const p0 = uvToPanelPx(z.u0, z.v0, panelW, panelH, dim.w, dim.h);
+  const p1 = uvToPanelPx(z.u1, z.v1, panelW, panelH, dim.w, dim.h);
+  const x = Math.min(p0.x, p1.x);
+  const y = Math.min(p0.y, p1.y);
+  const rw = Math.abs(p1.x - p0.x);
+  const rh = Math.abs(p1.y - p0.y);
+  const pad = Math.max(2, Math.min(panelW, panelH) * 0.004);
+  ctx.save();
+  ctx.fillStyle = 'rgba(34, 197, 94, 0.14)';
+  ctx.strokeStyle = 'rgba(34, 197, 94, 0.92)';
+  ctx.lineWidth = pad;
+  ctx.setLineDash([10, 7]);
+  ctx.fillRect(x, y, rw, rh);
+  ctx.strokeRect(x + pad / 2, y + pad / 2, rw - pad, rh - pad);
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+  ctx.font = `600 ${Math.max(11, Math.round(panelW * 0.085))}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur = 4;
+  ctx.fillText('Hot zone — ?sideHotZone=1', x + 6, y + Math.min(20, rh * 0.22));
+  ctx.restore();
+}
 
 function sidePanelCoverTransform(panelW, panelH, iw, ih) {
   const scale = Math.max(panelW / iw, panelH / ih);
@@ -1529,14 +1568,11 @@ function HeldCreatureOverlay({ creature, pos }) {
 // ---------------------------------------------------------------------------
 function SideAquarium({ creatures, scene = 'water' }) {
   const canvasRef = useRef(null);
+  const sideBgImgRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const W = canvas.offsetWidth;
-    const H = canvas.offsetHeight;
-    canvas.width = W;
-    canvas.height = H;
     const ctx = canvas.getContext('2d');
     const sceneKey = normalizeRoomBackground(scene);
     const src =
@@ -1546,12 +1582,22 @@ function SideAquarium({ creatures, scene = 'water' }) {
       SIDE_PANEL_CREATURE_GLOW_BY_SCENE.water;
 
     const paint = (img) => {
+      const W = canvas.offsetWidth;
+      const H = canvas.offsetHeight;
+      if (W < 2 || H < 2) return;
+      canvas.width = W;
+      canvas.height = H;
+
       if (!img || !drawCoverImage(ctx, img, W, H)) {
         const bg = ctx.createLinearGradient(0, 0, 0, H);
         bg.addColorStop(0, '#0a1a30');
         bg.addColorStop(1, '#050e18');
         ctx.fillStyle = bg;
         ctx.fillRect(0, 0, W, H);
+      }
+
+      if (shouldDrawSideHotZoneDebug()) {
+        drawSidePanelHotZoneOverlay(ctx, sceneKey, W, H);
       }
 
       if (!creatures.length) {
@@ -1570,15 +1616,38 @@ function SideAquarium({ creatures, scene = 'water' }) {
       });
     };
 
-    const img = new Image();
     let cancelled = false;
+    const img = new Image();
     img.onload = () => {
-      if (!cancelled) paint(img);
+      if (cancelled) return;
+      sideBgImgRef.current = img;
+      paint(img);
     };
     img.src = src;
-    if (img.complete && img.naturalWidth) paint(img);
+    if (img.complete && img.naturalWidth) {
+      sideBgImgRef.current = img;
+      paint(img);
+    }
+
+    const parent = canvas.parentElement;
+    const ro =
+      typeof ResizeObserver !== 'undefined' && parent
+        ? new ResizeObserver(() => {
+            const ready = sideBgImgRef.current?.complete && sideBgImgRef.current?.naturalWidth;
+            if (ready) paint(sideBgImgRef.current);
+          })
+        : null;
+    ro?.observe(parent);
+    const onWinResize = () => {
+      const ready = sideBgImgRef.current?.complete && sideBgImgRef.current?.naturalWidth;
+      if (ready) paint(sideBgImgRef.current);
+    };
+    window.addEventListener('resize', onWinResize);
+
     return () => {
       cancelled = true;
+      ro?.disconnect();
+      window.removeEventListener('resize', onWinResize);
     };
   }, [creatures, scene]);
 
