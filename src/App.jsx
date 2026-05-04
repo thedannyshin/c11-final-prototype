@@ -2907,7 +2907,6 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
 
       {isLandscape && inDrawRound ? (
         <div className="rotate-prompt" aria-live="assertive">
-          <span className="rotate-prompt-icon">⟳</span>
           <p className="rotate-prompt-text">Please rotate your phone back to portrait</p>
         </div>
       ) : null}
