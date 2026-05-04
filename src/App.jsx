@@ -398,6 +398,14 @@ function normalizeRoomBackground(v) {
   return 'water';
 }
 
+/** Pinch / draw overlay wording — aquarium vs grass (stars keeps generic copy). */
+function playHintLabels(sceneKey) {
+  const s = normalizeRoomBackground(sceneKey);
+  if (s === 'water') return { things: 'fishes', side: 'fish tank' };
+  if (s === 'grass') return { things: 'flowers', side: 'grass patch' };
+  return { things: 'creatures', side: 'right side' };
+}
+
 /** Load + decode all scene images so participant/Clocker switches hit cache (important on mobile). */
 function preloadSceneBackgroundArt() {
   const urls = new Set([...Object.values(CLOCKER_BG_BY_SCENE), ...Object.values(CLOCKER_SIDE_BG_BY_SCENE)]);
@@ -1478,14 +1486,16 @@ function AquariumCanvas({
           x: 0.10 + Math.random() * 0.80,
           y: -0.18,
           dropPhase: Math.random() * Math.PI * 2,
-          targetY: 0.38 + Math.random() * 0.20,
+          /** Rest depth after drop — wide vertical spread (norm coords, margins for drawing size). */
+          targetY: 0.18 + Math.random() * 0.62,
           // Populated when swim starts:
           dir: Math.random() < 0.5 ? 1 : -1,
           speed: 0.0009 + Math.random() * 0.0007,
           baseY: 0,
-          waveFreq: 0.5 + Math.random() * 0.8,
+          waveFreq: 0.42 + Math.random() * 0.95,
           wavePhase: Math.random() * Math.PI * 2,
-          waveAmp: 0.010 + Math.random() * 0.016,
+          /** Vertical bob while swimming — larger so lanes feel less “one height”. */
+          waveAmp: 0.022 + Math.random() * 0.042,
         });
       }
     }
@@ -2311,6 +2321,7 @@ function ClockerView({ room, shared, onResetRoom }) {
   const g = shared.game;
   const cd = getCountdownDisplay(g);
   const showPlayHud = g.phase === 'team1' || g.phase === 'team2';
+  const pinchPlayHint = playHintLabels(displayScene);
 
   return (
     <div
@@ -2403,7 +2414,7 @@ function ClockerView({ room, shared, onResetRoom }) {
           <p className="clocker-flow-results-hero">Time&apos;s Up!</p>
           <p className="clocker-flow-results-score">Team 1 — {g.team1Score} pts</p>
           <button type="button" className="clocker-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
-            Continue
+            Continue to Team 2
           </button>
         </div>
       ) : null}
@@ -2465,9 +2476,9 @@ function ClockerView({ room, shared, onResetRoom }) {
             {g.roundEndAt ? <p className="clocker-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
           </div>
           <p key={`clocker-pinch-hint-${g.phase}`} className="clocker-play-hint">
-            Pinch to grab creatures and
+            Pinch to grab {pinchPlayHint.things} and
             <br />
-            move them to the right side.
+            move them to the {pinchPlayHint.side}.
           </p>
         </div>
       ) : null}
@@ -2600,6 +2611,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
   const [, forceClockTick] = useState(0);
   const [sendPointsPop, setSendPointsPop] = useState(0);
   const scene = normalizeRoomBackground(shared.roomBackground);
+  const drawPlayHint = playHintLabels(scene);
   const bgUrl = CLOCKER_BG_BY_SCENE[scene] ?? CLOCKER_BG_BY_SCENE.water;
   const gm = shared.game;
   const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
@@ -2749,7 +2761,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
               }}
               overlay={
                 <p key={`participant-draw-hint-${gm.phase}`} className="participant-draw-hint">
-                  Draw as fast as you can—send as many creatures as you can before time runs out.
+                  Draw as fast as you can—send as many {drawPlayHint.things} as you can before time runs out.
                 </p>
               }
             />
