@@ -2871,7 +2871,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
               }}
               overlay={
                 <p key={`participant-draw-hint-${gm.phase}`} className="participant-draw-hint">
-                  Draw as fast as you can—send as many {drawPlayHint.things} as you can before time runs out.
+                  Draw and send as many {drawPlayHint.things} as you can before time runs out.
                 </p>
               }
             />
