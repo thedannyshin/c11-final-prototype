@@ -20,6 +20,8 @@ const COLORS = ['#FFFFFF', '#00D4FF', '#F43F5E', '#10B981', '#FBBF24', '#A78BFA'
 const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
 
 const GAME_ROUND_MS = 2 * 60 * 1000;
+/** If time is up but the Clocker never advanced phase (tab closed / lost), participant returns to join home after this wait. */
+const PARTICIPANT_STUCK_ROUND_GRACE_MS = 5000;
 const GAME_POINTS_DRAW = 10;
 const GAME_POINTS_MOVE = 10;
 /** Relocate to side panel but outside the illustrated “hot” zone (tank / grass patch). */
@@ -2633,9 +2635,10 @@ function ClockerView({ room, shared, onResetRoom }) {
   );
 }
 
-function ParticipantView({ shared, clientName, setClientName, clientColor, clientId }) {
+function ParticipantView({ shared, clientName, setClientName, clientColor, clientId, onExitToJoinHome }) {
   const [, forceClockTick] = useState(0);
   const [sendPointsPop, setSendPointsPop] = useState(0);
+  const stuckExitDoneRef = useRef(false);
   const scene = normalizeRoomBackground(shared.roomBackground);
   const drawPlayHint = playHintLabels(scene);
   const bgUrl = CLOCKER_BG_BY_SCENE[scene] ?? CLOCKER_BG_BY_SCENE.water;
@@ -2665,6 +2668,26 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
     const id = window.setInterval(() => forceClockTick((n) => n + 1), 250);
     return () => window.clearInterval(id);
   }, [gm.phase, gm.roundEndAt]);
+
+  useEffect(() => {
+    stuckExitDoneRef.current = false;
+  }, [gm.phase, gm.roundEndAt]);
+
+  useEffect(() => {
+    if (typeof onExitToJoinHome !== 'function') return undefined;
+    if (gm.phase !== 'team1' && gm.phase !== 'team2') return undefined;
+    if (gm.roundEndAt == null) return undefined;
+    const roundEndAt = gm.roundEndAt;
+    const tick = () => {
+      if (stuckExitDoneRef.current) return;
+      if (Date.now() <= roundEndAt + PARTICIPANT_STUCK_ROUND_GRACE_MS) return;
+      stuckExitDoneRef.current = true;
+      onExitToJoinHome();
+    };
+    tick();
+    const id = window.setInterval(tick, 500);
+    return () => window.clearInterval(id);
+  }, [gm.phase, gm.roundEndAt, onExitToJoinHome]);
 
   return (
     <div
@@ -2845,6 +2868,11 @@ export default function App() {
   const [clientName, setClientName] = useState('');
   const clientId = useMemo(() => crypto.randomUUID(), []);
   const clientColor = useMemo(() => COLORS[Math.floor(Math.random() * COLORS.length)], []);
+  const exitParticipantToJoinHome = useCallback(() => {
+    setRoom('');
+    setRoomInput('');
+    setMode('participant');
+  }, []);
 
   useEffect(() => { setUrlState({ room, mode }); }, [room, mode]);
 
@@ -2885,6 +2913,7 @@ export default function App() {
       setClientName={setClientName}
       clientColor={clientColor}
       clientId={clientId}
+      onExitToJoinHome={exitParticipantToJoinHome}
     />
   );
 }
