@@ -1586,6 +1586,7 @@ p {
   gap: 8px;
   flex-shrink: 0;
   width: 100%;
+  padding: 6px 0;
 }
 
 .swatches-inline {
@@ -1597,7 +1598,7 @@ p {
 
 .swatch-sm {
   flex: 1;
-  height: 36px;
+  height: 48px;
   border-radius: 50px;
   border: 1.5px solid rgba(255,255,255,0.15);
   cursor: pointer;
@@ -1620,9 +1621,9 @@ p {
 
 .pad-actions .button {
   flex: 1;
-  padding: 8px 16px;
-  min-height: 44px;
-  font-size: 0.875rem;
+  padding: 12px 16px;
+  min-height: 56px;
+  font-size: 1rem;
   border-radius: 12px;
   background: rgba(255,255,255,0.1);
   color: rgba(255,255,255,0.75);
