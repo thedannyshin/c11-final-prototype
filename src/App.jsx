@@ -20,7 +20,7 @@ const COLORS = ['#FFFFFF', '#00D4FF', '#F43F5E', '#10B981', '#FBBF24', '#A78BFA'
 const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
 
 const GAME_ROUND_MS = 2 * 60 * 1000;
-/** If time is up but the Clocker never advanced phase (tab closed / lost), participant returns to join home after this wait. */
+/** If time is up but the Clocker never advanced phase (tab closed / lost), artist returns to join home after this wait. */
 const PARTICIPANT_STUCK_ROUND_GRACE_MS = 5000;
 const GAME_POINTS_DRAW_MULTI_COLOR = 10;
 const GAME_POINTS_DRAW_SINGLE_COLOR = 5;
@@ -415,7 +415,7 @@ function playHintLabels(sceneKey) {
   return { things: 'stars', side: 'the jar', verb: 'grab' };
 }
 
-/** Load + decode all scene images so participant/Clocker switches hit cache (important on mobile). */
+/** Load + decode all scene images so artist/Clocker switches hit cache (important on mobile). */
 function preloadSceneBackgroundArt() {
   const urls = new Set([...Object.values(CLOCKER_BG_BY_SCENE), ...Object.values(CLOCKER_SIDE_BG_BY_SCENE)]);
   urls.forEach((src) => {
@@ -432,7 +432,7 @@ function preloadSceneBackgroundArt() {
 }
 
 /** Phone splash / join landing: cycles scene art + crossfade + zoom (not tied to Clocker’s Firebase scene). */
-function ParticipantSplashBackdrop({ active }) {
+function ArtistSplashBackdrop({ active }) {
   /** Index of the slide shown on the bottom (full-opacity) layer — unchanged during a crossfade. */
   const [slide, setSlide] = useState(0);
   /** Top layer opacity: 0 stable, animates 0→1 during crossfade only (bottom never fades or swaps mid-blend). */
@@ -486,28 +486,28 @@ function ParticipantSplashBackdrop({ active }) {
   const overSrc = CLOCKER_BG_BY_SCENE[overId];
 
   return (
-    <div className="participant-splash-bg" aria-hidden>
+    <div className="artist-splash-bg" aria-hidden>
       <div
-        className={`participant-splash-bg-zoom${zoomPaused ? ' participant-splash-bg-zoom--paused' : ''}`}
+        className={`artist-splash-bg-zoom${zoomPaused ? ' artist-splash-bg-zoom--paused' : ''}`}
       >
-        <div className="participant-splash-bg-layer" data-scene={baseId}>
+        <div className="artist-splash-bg-layer" data-scene={baseId}>
           <img
             src={baseSrc}
             alt=""
-            className="participant-splash-bg-img"
+            className="artist-splash-bg-img"
             draggable={false}
             decoding="async"
           />
         </div>
         <div
-          className="participant-splash-bg-layer participant-splash-bg-layer--overlay"
+          className="artist-splash-bg-layer artist-splash-bg-layer--overlay"
           data-scene={overId}
           style={{ opacity: overlayBlend, transition: tf }}
         >
           <img
             src={overSrc}
             alt=""
-            className="participant-splash-bg-img"
+            className="artist-splash-bg-img"
             draggable={false}
             decoding="async"
           />
@@ -643,13 +643,13 @@ function setUrlState({ room, mode }) {
 }
 
 function getJoinUrl(room) {
-  return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(room)}&mode=participant`;
+  return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(room)}&mode=artist`;
 }
 
-/** Roster: sorted participant clientIds → first = Team 1, second = Team 2; max one phone per team (2 total). */
-function computeAutoParticipantTeam(clientId, participants) {
-  const ids = Object.keys(participants || {})
-    .filter((id) => (participants[id]?.role || '') === 'participant')
+/** Roster: sorted artist clientIds → first = Team 1, second = Team 2; max one phone per team (2 total). */
+function computeAutoArtistTeam(clientId, artists) {
+  const ids = Object.keys(artists || {})
+    .filter((id) => (artists[id]?.role || '') === 'artist')
     .sort();
   const idx = ids.indexOf(clientId);
   if (idx < 0) return null;
@@ -657,7 +657,7 @@ function computeAutoParticipantTeam(clientId, participants) {
   return idx === 0 ? 1 : 2;
 }
 
-/** True for phone / tablet widths; wide screens default to Clocker, narrow to participant when URL does not specify. */
+/** True for phone / tablet widths; wide screens default to Clocker, narrow to artist when URL does not specify. */
 function isMobileViewport() {
   if (typeof window === 'undefined') return false;
   return window.matchMedia('(max-width: 1024px)').matches;
@@ -667,17 +667,20 @@ let cachedInitialAppState = null;
 function getInitialAppStateOnce() {
   if (cachedInitialAppState === null) {
     const { room: urlRoom, mode: urlModeRaw } = getUrlState();
-    const urlMode = urlModeRaw === 'host' ? CLOCKER_URL_MODE : urlModeRaw;
+    // Normalise legacy mode values: host→clocker, participant→artist.
+    const urlMode = urlModeRaw === 'host' ? CLOCKER_URL_MODE
+      : urlModeRaw === 'participant' ? 'artist'
+      : urlModeRaw;
     const modePinned =
-      urlModeRaw === 'host' || urlMode === CLOCKER_URL_MODE || urlModeRaw === 'participant';
+      urlModeRaw === 'host' || urlModeRaw === 'participant' || urlMode === CLOCKER_URL_MODE || urlMode === 'artist';
     const mobile = isMobileViewport();
 
     if (modePinned) {
       let mode = urlMode;
       // Normalize share links: Clocker dashboard on wide screens, draw UI on phones.
       if ((urlModeRaw === 'host' || urlMode === CLOCKER_URL_MODE) && mobile) {
-        mode = 'participant';
-      } else if (urlModeRaw === 'participant' && !mobile) {
+        mode = 'artist';
+      } else if (urlModeRaw === 'artist' && !mobile) {
         mode = CLOCKER_URL_MODE;
       }
       cachedInitialAppState = {
@@ -688,13 +691,13 @@ function getInitialAppStateOnce() {
     } else if (urlRoom) {
       cachedInitialAppState = {
         room: urlRoom,
-        mode: 'participant',
+        mode: 'artist',
         roomInput: urlRoom,
       };
     } else if (isMobileViewport()) {
       cachedInitialAppState = {
         room: '',
-        mode: 'participant',
+        mode: 'artist',
         roomInput: '',
       };
     } else {
@@ -854,11 +857,11 @@ function createTransport(roomId) {
   });
 
   const unsubPresence = onValue(presenceRef, (snapshot) => {
-    const participants = {};
+    const artists = {};
     snapshot.forEach((child) => {
-      if (child.val()) participants[child.key] = { ...child.val(), lastSeen: Date.now() };
+      if (child.val()) artists[child.key] = { ...child.val(), lastSeen: Date.now() };
     });
-    handle({ type: 'room:state', payload: { participants } });
+    handle({ type: 'room:state', payload: { artists } });
   });
 
   const unsubSettingsBg = onValue(settingsBgRef, (snapshot) => {
@@ -1129,11 +1132,11 @@ function useHandTracking(enabled, cameraDeviceId = '') {
 }
 
 // ---------------------------------------------------------------------------
-// Shared room hook — manages strokes (now characters) + participants.
+// Shared room hook — manages strokes (now characters) + artists.
 // ---------------------------------------------------------------------------
 function useSharedRoom(roomId, client) {
   const [strokes, setStrokes] = useState([]);
-  const [participants, setParticipants] = useState({});
+  const [artists, setArtists] = useState({});
   const [roomBackground, setRoomBackgroundState] = useState('water');
   const [roomBackgroundExplicit, setRoomBackgroundExplicit] = useState(false);
   const [game, setGame] = useState(defaultGameState);
@@ -1165,7 +1168,7 @@ function useSharedRoom(roomId, client) {
 
     // Clear stale state from the previous room before loading the new one.
     setStrokes([]);
-    setParticipants({});
+    setArtists({});
     setRoomBackgroundState('water');
     setRoomBackgroundExplicit(false);
     setGame(defaultGameState());
@@ -1186,7 +1189,7 @@ function useSharedRoom(roomId, client) {
 
       const initial = transport.readState();
       if (initial?.payload?.strokes) setStrokes(initial.payload.strokes);
-      if (initial?.payload?.participants) setParticipants(initial.payload.participants);
+      if (initial?.payload?.artists) setArtists(initial.payload.artists);
 
       unsub = transport.subscribe((message) => {
         if (!message) return;
@@ -1204,7 +1207,7 @@ function useSharedRoom(roomId, client) {
         if (message.type === 'canvas:clear') setStrokes([]);
 
         if (message.type === 'presence:update' && message.clientId !== client.clientId) {
-          setParticipants((prev) => ({
+          setArtists((prev) => ({
             ...prev,
             [message.clientId]: { ...message.payload, lastSeen: Date.now() },
           }));
@@ -1212,8 +1215,8 @@ function useSharedRoom(roomId, client) {
 
         if (message.type === 'room:state' && message.payload) {
           if (Array.isArray(message.payload.strokes)) setStrokes(message.payload.strokes);
-          if (message.payload.participants && typeof message.payload.participants === 'object') {
-            setParticipants(message.payload.participants);
+          if (message.payload.artists && typeof message.payload.artists === 'object') {
+            setArtists(message.payload.artists);
           }
           if (message.payload.roomBackground !== undefined) {
             setRoomBackgroundState(normalizeRoomBackground(message.payload.roomBackground));
@@ -1257,10 +1260,10 @@ function useSharedRoom(roomId, client) {
     };
   }, [roomId, client.clientId]);
 
-  // Prune stale participants.
+  // Prune stale artists.
   useEffect(() => {
     const id = setInterval(() => {
-      setParticipants((prev) => {
+      setArtists((prev) => {
         const next = { ...prev };
         const now = Date.now();
         Object.keys(next).forEach((k) => { if (now - (next[k].lastSeen || 0) > 7000) delete next[k]; });
@@ -1272,8 +1275,8 @@ function useSharedRoom(roomId, client) {
 
   useEffect(() => {
     if (!transportRef.current || !roomId) return;
-    transportRef.current.writeState({ strokes, participants });
-  }, [roomId, strokes, participants]);
+    transportRef.current.writeState({ strokes, artists });
+  }, [roomId, strokes, artists]);
 
   const sendCanvasClear = useCallback(() => {
     setStrokes([]);
@@ -1282,7 +1285,7 @@ function useSharedRoom(roomId, client) {
 
   return useMemo(() => ({
     strokes,
-    participants,
+    artists,
     roomBackground,
     roomBackgroundExplicit,
     game,
@@ -1415,7 +1418,7 @@ function useSharedRoom(roomId, client) {
         payload: b,
       });
     },
-  }), [strokes, participants, roomBackground, roomBackgroundExplicit, game, client.clientId, sendCanvasClear]);
+  }), [strokes, artists, roomBackground, roomBackgroundExplicit, game, client.clientId, sendCanvasClear]);
 }
 
 
@@ -2697,7 +2700,7 @@ function useIsLandscape() {
   return landscape;
 }
 
-function ParticipantView({ shared, clientName, setClientName, clientColor, clientId, onExitToJoinHome }) {
+function ArtistView({ shared, clientName, setClientName, clientColor, clientId, onExitToJoinHome }) {
   const [, forceClockTick] = useState(0);
   const [sendPointsPop, setSendPointsPop] = useState(0);
   const [lastDrawDelta, setLastDrawDelta] = useState(GAME_POINTS_DRAW_MULTI_COLOR);
@@ -2714,15 +2717,15 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
   );
   const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
   const assignedTeam = useMemo(
-    () => computeAutoParticipantTeam(clientId, shared.participants),
-    [clientId, shared.participants],
+    () => computeAutoArtistTeam(clientId, shared.artists),
+    [clientId, shared.artists],
   );
   const myTurnToDraw =
     inDrawRound &&
     ((gm.phase === 'team1' && assignedTeam === 1) || (gm.phase === 'team2' && assignedTeam === 2));
   const countdownActiveTeam =
     gm.phase === 'countdown_team1' ? 1 : gm.phase === 'countdown_team2' ? 2 : null;
-  const participantCountsDown =
+  const artistCountsDown =
     countdownActiveTeam != null && assignedTeam === countdownActiveTeam;
   const cdPhone = getCountdownDisplay(gm);
 
@@ -2755,26 +2758,26 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
 
   return (
     <div
-      className={`participant-shell${gm.phase === 'splash' && !shared.roomBackgroundExplicit ? ' participant-shell--splash-mode' : ''}${
-        inDrawRound && myTurnToDraw ? ' participant-shell--draw-pad' : ''
+      className={`artist-shell${gm.phase === 'splash' && !shared.roomBackgroundExplicit ? ' artist-shell--splash-mode' : ''}${
+        inDrawRound && myTurnToDraw ? ' artist-shell--draw-pad' : ''
       }`}
       data-scene={scene}
       data-my-team={assignedTeam == null ? 'none' : String(assignedTeam)}
-      style={{ '--participant-shell-bg': `url('${bgUrl}')` }}
+      style={{ '--artist-shell-bg': `url('${bgUrl}')` }}
     >
-      {gm.phase === 'splash' ? <ParticipantSplashBackdrop active={!shared.roomBackgroundExplicit} /> : null}
+      {gm.phase === 'splash' ? <ArtistSplashBackdrop active={!shared.roomBackgroundExplicit} /> : null}
 
       {gm.phase === 'splash' ? (
         <>
-          <div className="participant-flow-overlay participant-flow-overlay--splash">
-            <div className="participant-flow-inner participant-flow-inner--splash-card">
+          <div className="artist-flow-overlay artist-flow-overlay--splash">
+            <div className="artist-flow-inner artist-flow-inner--splash-card">
               <ClockItLogo variant="phone" />
-              <p className="participant-assigned-team" role="status" aria-live="polite">
+              <p className="artist-assigned-team" role="status" aria-live="polite">
                 {assignedTeam === 1 || assignedTeam === 2 ? (
                   <>
                     You&apos;re on <strong>Team {assignedTeam}</strong>
                   </>
-                ) : shared.participants?.[clientId] ? (
+                ) : shared.artists?.[clientId] ? (
                   <>
                     This room already has <strong>two players</strong> (one per team). Watch the Clocker screen — you
                     won&apos;t draw from this phone.
@@ -2790,16 +2793,16 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
       ) : null}
 
       {(gm.phase === 'countdown_team1' || gm.phase === 'countdown_team2') ? (
-        participantCountsDown ? (
-          <div className="participant-flow-overlay participant-flow-overlay--countdown" aria-live="assertive">
-            <span className="participant-flow-countdown-line" key={`${gm.phase}-${gm.countdownStep ?? 0}`}>
+        artistCountsDown ? (
+          <div className="artist-flow-overlay artist-flow-overlay--countdown" aria-live="assertive">
+            <span className="artist-flow-countdown-line" key={`${gm.phase}-${gm.countdownStep ?? 0}`}>
               {cdPhone.line1}
             </span>
           </div>
         ) : (
-          <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
+          <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
             <ClockItLogo variant="phone" />
-            <p className="participant-flow-results-title">
+            <p className="artist-flow-results-title">
               Team {countdownActiveTeam}&apos;s turn
             </p>
           </div>
@@ -2807,59 +2810,59 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
       ) : null}
 
       {gm.phase === 'results_team1' ? (
-        <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
+        <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
           <ClockItLogo variant="phone" />
-          <p className="participant-flow-results-title">Time&apos;s up</p>
-          <p className="participant-flow-results-score">Team 1 — {gm.team1Score} pts</p>
+          <p className="artist-flow-results-title">Time&apos;s up</p>
+          <p className="artist-flow-results-score">Team 1 — {gm.team1Score} pts</p>
         </div>
       ) : null}
 
       {gm.phase === 'results_team2' ? (
-        <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
+        <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
           <ClockItLogo variant="phone" />
-          <p className="participant-flow-results-title">Time&apos;s up</p>
-          <p className="participant-flow-results-score">Team 2 — {gm.team2Score} pts</p>
+          <p className="artist-flow-results-title">Time&apos;s up</p>
+          <p className="artist-flow-results-score">Team 2 — {gm.team2Score} pts</p>
         </div>
       ) : null}
 
       {gm.phase === 'final' ? (
-        <div className="participant-flow-overlay participant-flow-overlay--final">
+        <div className="artist-flow-overlay artist-flow-overlay--final">
           <ClockItLogo variant="phone" />
-          <div className="participant-flow-final-grid">
-            <div className="participant-flow-final-box">
+          <div className="artist-flow-final-grid">
+            <div className="artist-flow-final-box">
               <span>Team 1</span>
               <strong>{gm.team1Score}</strong>
             </div>
-            <div className="participant-flow-final-box">
+            <div className="artist-flow-final-box">
               <span>Team 2</span>
               <strong>{gm.team2Score}</strong>
             </div>
           </div>
-          <p className="participant-flow-winner">{getWinnerPhrase(gm.team1Score, gm.team2Score)}</p>
+          <p className="artist-flow-winner">{getWinnerPhrase(gm.team1Score, gm.team2Score)}</p>
         </div>
       ) : null}
 
       {inDrawRound ? (
         <>
-          <div className="participant-play-hud">
-            <div className="participant-play-hud-row">
-              <p className="participant-play-team">
+          <div className="artist-play-hud">
+            <div className="artist-play-hud-row">
+              <p className="artist-play-team">
                 {gm.phase === 'team1' ? 'Team 1' : 'Team 2'}
               </p>
-              <div className="participant-play-score-wrap">
+              <div className="artist-play-score-wrap">
                 <span
-                  key={`participant-play-score-${playHudScoreBump}`}
-                  className={`participant-play-score-num${playHudScoreBump > 0 ? ' play-score-total--bump' : ''}`}
+                  key={`artist-play-score-${playHudScoreBump}`}
+                  className={`artist-play-score-num${playHudScoreBump > 0 ? ' play-score-total--bump' : ''}`}
                 >
                   {playHudScore ?? 0}
                 </span>
               </div>
               {gm.roundEndAt ? (
-                <p className="participant-play-timer" aria-live="polite">
+                <p className="artist-play-timer" aria-live="polite">
                   {formatRoundClock(gm.roundEndAt)}
                 </p>
               ) : (
-                <p className="participant-play-timer" aria-live="polite">
+                <p className="artist-play-timer" aria-live="polite">
                   —
                 </p>
               )}
@@ -2867,16 +2870,16 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
           </div>
           {!myTurnToDraw ? (
             assignedTeam === 1 || assignedTeam === 2 ? (
-              <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
+              <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
                 <ClockItLogo variant="phone" />
-                <p className="participant-flow-results-title">
+                <p className="artist-flow-results-title">
                   Team {gm.phase === 'team1' ? 1 : 2}&apos;s turn
                 </p>
               </div>
             ) : (
-              <div className="participant-flow-overlay participant-flow-overlay--results" aria-live="polite">
+              <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
                 <ClockItLogo variant="phone" />
-                <p className="participant-flow-results-title">Room is full</p>
+                <p className="artist-flow-results-title">Room is full</p>
               </div>
             )
           ) : (
@@ -2887,7 +2890,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
                 setSendPointsPop((n) => n + 1);
               }}
               overlay={
-                <p key={`participant-draw-hint-${gm.phase}`} className="participant-draw-hint">
+                <p key={`artist-draw-hint-${gm.phase}`} className="artist-draw-hint">
                   Draw and send as many {drawPlayHint.things} as you can before time runs out.
                 </p>
               }
@@ -2896,7 +2899,7 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
           {myTurnToDraw && sendPointsPop > 0 ? (
             <span
               key={sendPointsPop}
-              className={`points-pop points-pop--participant${lastDrawDelta >= 10 ? ' points-pop--high' : ' points-pop--low'}`}
+              className={`points-pop points-pop--artist${lastDrawDelta >= 10 ? ' points-pop--high' : ' points-pop--low'}`}
               aria-hidden
             >
               +{lastDrawDelta}
@@ -2914,19 +2917,19 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
   );
 }
 
-/** Shown when there is no room in the URL (typical phone open). Match participant splash; join only via QR link. */
+/** Shown when there is no room in the URL (typical phone open). Match artist splash; join only via QR link. */
 function JoinLandingView() {
   return (
     <div
-      className="participant-shell participant-shell--splash-mode"
+      className="artist-shell artist-shell--splash-mode"
       data-scene="water"
-      style={{ '--participant-shell-bg': `url('${CLOCKER_BG_BY_SCENE.water}')` }}
+      style={{ '--artist-shell-bg': `url('${CLOCKER_BG_BY_SCENE.water}')` }}
     >
-      <ParticipantSplashBackdrop active />
-      <div className="participant-flow-overlay participant-flow-overlay--splash">
-        <div className="participant-flow-inner participant-flow-inner--splash-card">
+      <ArtistSplashBackdrop active />
+      <div className="artist-flow-overlay artist-flow-overlay--splash">
+        <div className="artist-flow-inner artist-flow-inner--splash-card">
           <ClockItLogo variant="phone" />
-          <p className="participant-assigned-team" role="status">
+          <p className="artist-assigned-team" role="status">
             Scan the QR code on the Clocker screen to join.
           </p>
         </div>
@@ -2947,10 +2950,10 @@ export default function App() {
   const [clientName, setClientName] = useState('');
   const clientId = useMemo(() => crypto.randomUUID(), []);
   const clientColor = useMemo(() => COLORS[Math.floor(Math.random() * COLORS.length)], []);
-  const exitParticipantToJoinHome = useCallback(() => {
+  const exitArtistToJoinHome = useCallback(() => {
     setRoom('');
     setRoomInput('');
-    setMode('participant');
+    setMode('artist');
   }, []);
 
   useEffect(() => { setUrlState({ room, mode }); }, [room, mode]);
@@ -2962,7 +2965,7 @@ export default function App() {
   const shared = useSharedRoom(room, {
     clientId,
     name: clientName || (mode === CLOCKER_URL_MODE ? 'Clocker' : 'Anonymous'),
-    role: mode || 'participant',
+    role: mode || 'artist',
     color: clientColor,
   });
 
@@ -2986,13 +2989,13 @@ export default function App() {
   }
 
   return (
-    <ParticipantView
+    <ArtistView
       shared={shared}
       clientName={clientName}
       setClientName={setClientName}
       clientColor={clientColor}
       clientId={clientId}
-      onExitToJoinHome={exitParticipantToJoinHome}
+      onExitToJoinHome={exitArtistToJoinHome}
     />
   );
 }
