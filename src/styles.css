@@ -1586,7 +1586,6 @@ p {
   gap: 8px;
   flex-shrink: 0;
   width: 100%;
-  padding: 14px 0;
 }
 
 .swatches-inline {
@@ -1594,6 +1593,7 @@ p {
   gap: 5px;
   width: 100%;
   justify-content: space-between;
+  margin: 10px 0;
 }
 
 .swatch-sm {
