@@ -183,8 +183,9 @@ const SIDE_PANEL_INTRINSIC_PX = {
 };
 /**
  * Hot zones in normalised image UV space (0–1) for side-panel drops — matches cover-fit art.
- * Water/grass tuned for 580×1024 portrait side assets; stars = full frame.
- * Debug overlay: add ?sideHotZone=1 to the Clocker URL, adjust these values, screenshot / send back.
+ * Water + stars use these rectangles. Grass uses a **pixel mask** (irregular green blob vs white
+ * paper) built from `side-bg-grass.png`; this UV entry is only a fallback until the mask loads.
+ * Debug overlay: add ?sideHotZone=1 to the Clocker URL.
  */
 const SIDE_PANEL_UV_HOT_ZONE = {
   /* v0 must include the tank lid / top glass — too high a v0 blocks moving above the tank body */
@@ -202,8 +203,19 @@ function shouldDrawSideHotZoneDebug() {
   }
 }
 
-/** Semi-transparent overlay so UV bounds can be tuned against the side art. */
+/** Semi-transparent overlay so UV bounds / grass mask can be tuned against the side art. */
 function drawSidePanelHotZoneOverlay(ctx, sceneKey, panelW, panelH) {
+  if (sceneKey === 'grass' && grassSideMaskData) {
+    drawGrassSideMaskDebugOverlay(ctx, panelW, panelH);
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = `600 ${Math.max(10, Math.round(panelW * 0.07))}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 4;
+    ctx.fillText('Grass hot = green pixels (mask)', 6, 18);
+    ctx.restore();
+    return;
+  }
   const z = SIDE_PANEL_UV_HOT_ZONE[sceneKey];
   if (!z || (z.u0 === 0 && z.v0 === 0 && z.u1 === 1 && z.v1 === 1)) return;
   const dim = SIDE_PANEL_INTRINSIC_PX[sceneKey] ?? SIDE_PANEL_INTRINSIC_PX.water;
@@ -261,7 +273,142 @@ function uvToPanelPx(u, v, panelW, panelH, iw, ih) {
   return { x: ix * scale + dx, y: iy * scale + dy };
 }
 
+function sidePanelPxToImagePx(panelPx, panelPy, panelW, panelH, iw, ih) {
+  const { scale, dx, dy } = sidePanelCoverTransform(panelW, panelH, iw, ih);
+  return {
+    ix: (panelPx - dx) / scale,
+    iy: (panelPy - dy) / scale,
+  };
+}
+
+function sidePanelImagePxToPanelPx(ix, iy, panelW, panelH, iw, ih) {
+  const { scale, dx, dy } = sidePanelCoverTransform(panelW, panelH, iw, ih);
+  return { x: ix * scale + dx, y: iy * scale + dy };
+}
+
+/**
+ * Grass side art is an irregular blob on white — we rasterise a mask instead of a UV rectangle.
+ * Tune in /side-hot-zone-tuner/ (grass mode) and paste the four numbers back here.
+ */
+const GRASS_MASK_BG_CH = 246;
+const GRASS_MASK_SUM_MIN = 736;
+const GRASS_MASK_G_LEAD_R = -10;
+const GRASS_MASK_G_LEAD_B = 5;
+
+function isGrassSideMaskPixel(r, g, b) {
+  const sum = r + g + b;
+  if (sum >= GRASS_MASK_SUM_MIN) return false;
+  if (r >= GRASS_MASK_BG_CH && g >= GRASS_MASK_BG_CH && b >= GRASS_MASK_BG_CH) return false;
+  return g >= r + GRASS_MASK_G_LEAD_R && g >= b + GRASS_MASK_G_LEAD_B;
+}
+
+/** @typedef {{ mask: Uint8Array, w: number, h: number, cx: number, cy: number }} GrassSideMask */
+
+/** Built once from `side-bg-grass.png`; null until load (grass then uses UV fallback). */
+let grassSideMaskData = /** @type {GrassSideMask | null} */ (null);
+
+function buildGrassSideMaskFromImage(img) {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  if (!w || !h) return null;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const x = c.getContext('2d');
+  if (!x) return null;
+  x.drawImage(img, 0, 0);
+  let data;
+  try {
+    data = x.getImageData(0, 0, w, h).data;
+  } catch {
+    return null;
+  }
+  const mask = new Uint8Array(w * h);
+  let sumX = 0;
+  let sumY = 0;
+  let n = 0;
+  for (let j = 0; j < h; j++) {
+    for (let i = 0; i < w; i++) {
+      const o = (j * w + i) * 4;
+      const rv = data[o];
+      const gv = data[o + 1];
+      const bv = data[o + 2];
+      const on = isGrassSideMaskPixel(rv, gv, bv) ? 1 : 0;
+      mask[j * w + i] = on;
+      if (on) {
+        sumX += i + 0.5;
+        sumY += j + 0.5;
+        n += 1;
+      }
+    }
+  }
+  const cx = n ? sumX / n : w / 2;
+  const cy = n ? sumY / n : h / 2;
+  return { mask, w, h, cx, cy };
+}
+
+function startGrassSideMaskBuild() {
+  const im = new Image();
+  im.onload = () => {
+    grassSideMaskData = buildGrassSideMaskFromImage(im);
+  };
+  im.onerror = () => {
+    grassSideMaskData = null;
+  };
+  im.src = CLOCKER_SIDE_BG_BY_SCENE.grass;
+}
+
+function grassMaskHit(maskData, ix, iy) {
+  const i = Math.floor(ix);
+  const j = Math.floor(iy);
+  if (i < 0 || j < 0 || i >= maskData.w || j >= maskData.h) return false;
+  return maskData.mask[j * maskData.w + i] === 1;
+}
+
+function grassPanelContains(panelPx, panelPy, panelW, panelH, maskData) {
+  const dim = SIDE_PANEL_INTRINSIC_PX.grass;
+  const { ix, iy } = sidePanelPxToImagePx(panelPx, panelPy, panelW, panelH, dim.w, dim.h);
+  return grassMaskHit(maskData, ix, iy);
+}
+
+function grassPanelClamp(panelPx, panelPy, panelW, panelH, maskData) {
+  const dim = SIDE_PANEL_INTRINSIC_PX.grass;
+  const { ix, iy } = sidePanelPxToImagePx(panelPx, panelPy, panelW, panelH, dim.w, dim.h);
+  if (grassMaskHit(maskData, ix, iy)) return { x: panelPx, y: panelPy };
+  const { cx, cy } = maskData;
+  for (let t = 0; t <= 1; t += 0.02) {
+    const mx = ix + (cx - ix) * t;
+    const my = iy + (cy - iy) * t;
+    if (grassMaskHit(maskData, mx, my)) {
+      return sidePanelImagePxToPanelPx(mx, my, panelW, panelH, dim.w, dim.h);
+    }
+  }
+  return sidePanelImagePxToPanelPx(cx, cy, panelW, panelH, dim.w, dim.h);
+}
+
+function drawGrassSideMaskDebugOverlay(ctx, panelW, panelH) {
+  const data = grassSideMaskData;
+  if (!data) return;
+  const dim = SIDE_PANEL_INTRINSIC_PX.grass;
+  const step = 5;
+  ctx.save();
+  for (let j = 0; j < data.h; j += step) {
+    for (let i = 0; i < data.w; i += step) {
+      if (!data.mask[j * data.w + i]) continue;
+      const u = (i + 0.5) / data.w;
+      const v = (j + 0.5) / data.h;
+      const p = uvToPanelPx(u, v, panelW, panelH, dim.w, dim.h);
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.32)';
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    }
+  }
+  ctx.restore();
+}
+
 function sidePanelReleaseInHotZone(sceneKey, panelPx, panelPy, panelW, panelH) {
+  if (sceneKey === 'grass' && grassSideMaskData) {
+    return grassPanelContains(panelPx, panelPy, panelW, panelH, grassSideMaskData);
+  }
   const dim = SIDE_PANEL_INTRINSIC_PX[sceneKey] ?? SIDE_PANEL_INTRINSIC_PX.water;
   const { u, v } = sidePanelPxToUv(panelPx, panelPy, panelW, panelH, dim.w, dim.h);
   if (!Number.isFinite(u) || !Number.isFinite(v)) return false;
@@ -270,6 +417,9 @@ function sidePanelReleaseInHotZone(sceneKey, panelPx, panelPy, panelW, panelH) {
 }
 
 function clampSidePanelDropPx(sceneKey, panelPx, panelPy, panelW, panelH) {
+  if (sceneKey === 'grass' && grassSideMaskData) {
+    return grassPanelClamp(panelPx, panelPy, panelW, panelH, grassSideMaskData);
+  }
   const dim = SIDE_PANEL_INTRINSIC_PX[sceneKey] ?? SIDE_PANEL_INTRINSIC_PX.water;
   const { u, v } = sidePanelPxToUv(panelPx, panelPy, panelW, panelH, dim.w, dim.h);
   const u0 = Number.isFinite(u) ? u : 0.5;
@@ -321,6 +471,7 @@ function preloadSceneBackgroundArt() {
   });
   const logo = new Image();
   logo.src = CLOCKIT_LOGO_PATH;
+  startGrassSideMaskBuild();
 }
 
 /** Phone splash / join landing: cycles scene art + crossfade + zoom (not tied to Clocker’s Firebase scene). */

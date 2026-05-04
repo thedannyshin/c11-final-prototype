@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Side panel hot zone tuner</title>
+    <style>
+      :root {
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        color: #e2e8f0;
+        background: #0b1220;
+        line-height: 1.45;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(5, 10, 20, 0.95);
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+      .sub {
+        margin: 0;
+        font-size: 0.8rem;
+        color: rgba(226, 232, 240, 0.65);
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        align-items: center;
+        padding: 10px 16px;
+        background: rgba(15, 23, 42, 0.9);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .grass-tools {
+        display: none;
+        flex-wrap: wrap;
+        gap: 10px 18px;
+        align-items: center;
+        width: 100%;
+        padding-top: 4px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        margin-top: 4px;
+      }
+      .grass-tools.is-visible {
+        display: flex;
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+      }
+      select,
+      input[type='range'],
+      button {
+        font: inherit;
+      }
+      select {
+        background: #1e293b;
+        color: #f1f5f9;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        padding: 6px 10px;
+      }
+      input[type='range'] {
+        width: 120px;
+      }
+      button {
+        cursor: pointer;
+        border: none;
+        border-radius: 10px;
+        padding: 8px 14px;
+        font-weight: 600;
+        background: #22c55e;
+        color: #052e16;
+      }
+      button.secondary {
+        background: #334155;
+        color: #e2e8f0;
+      }
+      button:active {
+        transform: scale(0.98);
+      }
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 12px 16px 20px;
+        gap: 12px;
+      }
+      .preview-wrap {
+        flex: 1;
+        min-height: 280px;
+        display: flex;
+        justify-content: center;
+        align-items: stretch;
+        background: #020617;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+      }
+      #sidePanel {
+        position: relative;
+        height: 100%;
+        min-width: 120px;
+        max-width: 100%;
+        background: #000;
+      }
+      #cv {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #handles {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .handle {
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        margin: -9px 0 0 -9px;
+        border-radius: 50%;
+        background: #22c55e;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        pointer-events: auto;
+        cursor: grab;
+        touch-action: none;
+      }
+      .handle:active {
+        cursor: grabbing;
+      }
+      .export {
+        background: #0f172a;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 0.78rem;
+        overflow: auto;
+      }
+      .export h2 {
+        margin: 0 0 8px;
+        font-size: 0.85rem;
+        color: #94a3b8;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: #86efac;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .hint {
+        font-size: 0.78rem;
+        color: rgba(226, 232, 240, 0.55);
+        margin-top: 8px;
+      }
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #14532d;
+        color: #dcfce7;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-weight: 600;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+        z-index: 50;
+      }
+      .toast.show {
+        opacity: 1;
+      }
+      .mask-stat {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Side panel hot zone tuner</h1>
+      <p class="sub">
+        <strong>Aquarium / stars:</strong> drag the four handles — copy into <code>SIDE_PANEL_UV_HOT_ZONE</code>.
+        <strong>Grass:</strong> irregular blob — use sliders so the green overlay matches the art, then copy the four
+        <code>GRASS_MASK_*</code> constants into <code>App.jsx</code> (same names as in the game). Open on your Vercel
+        URL as <code>/side-hot-zone-tuner/</code>.
+      </p>
+    </header>
+    <div class="toolbar">
+      <label>
+        Scene
+        <select id="scene"></select>
+      </label>
+      <label>
+        Panel width
+        <input type="range" id="panelFrac" min="0.15" max="0.5" step="0.01" value="0.3" />
+        <span id="panelFracLabel"></span>
+      </label>
+      <button type="button" class="secondary" id="btnReset">Reset scene defaults</button>
+      <button type="button" id="btnCopy">Copy snippet</button>
+      <div class="grass-tools" id="grassTools">
+        <label title="Treat RGB all above this as white paper (not grass)">
+          BG_CH
+          <input type="range" id="gBgCh" min="220" max="255" step="1" value="246" />
+          <span id="gBgChVal"></span>
+        </label>
+        <label title="If R+G+B above this, not grass (bright paper)">
+          SUM_MIN
+          <input type="range" id="gSum" min="680" max="765" step="1" value="736" />
+          <span id="gSumVal"></span>
+        </label>
+        <label title="Grass: G >= R + this (often negative)">
+          G_LEAD_R
+          <input type="range" id="gLeadR" min="-40" max="25" step="1" value="-10" />
+          <span id="gLeadRVal"></span>
+        </label>
+        <label title="Grass: G >= B + this">
+          G_LEAD_B
+          <input type="range" id="gLeadB" min="-15" max="45" step="1" value="5" />
+          <span id="gLeadBVal"></span>
+        </label>
+        <span class="mask-stat" id="maskStat"></span>
+      </div>
+    </div>
+    <div class="main">
+      <div class="preview-wrap">
+        <div id="sidePanel">
+          <canvas id="cv"></canvas>
+          <div id="handles" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="export">
+        <h2 id="exportTitle">Paste into App.jsx</h2>
+        <pre id="snippet"></pre>
+        <p class="hint" id="exportHint"></p>
+      </div>
+    </div>
+    <div id="toast" class="toast">Copied</div>
+
+    <script type="module">
+      const INTRINSIC = {
+        water: { w: 580, h: 1024 },
+        grass: { w: 580, h: 1024 },
+        stars: { w: 1920, h: 1240 },
+      };
+      const SRC = {
+        water: '/side-bg-water.png',
+        grass: '/side-bg-grass.png',
+        stars: '/bg-starry.jpg',
+      };
+      const DEFAULT_UV = {
+        water: { u0: 0.08, v0: 0.18, u1: 0.92, v1: 0.97 },
+        grass: { u0: 0.12, v0: 0.22, u1: 0.88, v1: 0.86 },
+        stars: { u0: 0, v0: 0, u1: 1, v1: 1 },
+      };
+      const DEFAULT_GRASS = {
+        GRASS_MASK_BG_CH: 246,
+        GRASS_MASK_SUM_MIN: 736,
+        GRASS_MASK_G_LEAD_R: -10,
+        GRASS_MASK_G_LEAD_B: 5,
+      };
+
+      function sidePanelCoverTransform(panelW, panelH, iw, ih) {
+        const scale = Math.max(panelW / iw, panelH / ih);
+        const dw = iw * scale;
+        const dh = ih * scale;
+        const dx = (panelW - dw) / 2;
+        const dy = (panelH - dh) / 2;
+        return { scale, dx, dy };
+      }
+
+      function panelPxToUv(px, py, panelW, panelH, iw, ih) {
+        const { scale, dx, dy } = sidePanelCoverTransform(panelW, panelH, iw, ih);
+        const u = (px - dx) / scale / iw;
+        const v = (py - dy) / scale / ih;
+        return { u, v };
+      }
+
+      function uvToPanelPx(u, v, panelW, panelH, iw, ih) {
+        const { scale, dx, dy } = sidePanelCoverTransform(panelW, panelH, iw, ih);
+        return { x: u * iw * scale + dx, y: v * ih * scale + dy };
+      }
+
+      function readGrassParams() {
+        return {
+          GRASS_MASK_BG_CH: Number(document.getElementById('gBgCh').value),
+          GRASS_MASK_SUM_MIN: Number(document.getElementById('gSum').value),
+          GRASS_MASK_G_LEAD_R: Number(document.getElementById('gLeadR').value),
+          GRASS_MASK_G_LEAD_B: Number(document.getElementById('gLeadB').value),
+        };
+      }
+
+      function isGrassMaskPixel(r, g, b, p) {
+        const sum = r + g + b;
+        if (sum >= p.GRASS_MASK_SUM_MIN) return false;
+        if (r >= p.GRASS_MASK_BG_CH && g >= p.GRASS_MASK_BG_CH && b >= p.GRASS_MASK_BG_CH) return false;
+        return g >= r + p.GRASS_MASK_G_LEAD_R && g >= b + p.GRASS_MASK_G_LEAD_B;
+      }
+
+      function buildGrassMaskFromImageData(img, p) {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const x = c.getContext('2d');
+        x.drawImage(img, 0, 0);
+        const { data } = x.getImageData(0, 0, w, h);
+        const mask = new Uint8Array(w * h);
+        let n = 0;
+        for (let j = 0; j < h; j++) {
+          for (let i = 0; i < w; i++) {
+            const o = (j * w + i) * 4;
+            const on = isGrassMaskPixel(data[o], data[o + 1], data[o + 2], p) ? 1 : 0;
+            mask[j * w + i] = on;
+            if (on) n += 1;
+          }
+        }
+        return { mask, w, h, count: n };
+      }
+
+      const sceneSelect = document.getElementById('scene');
+      const panelFracEl = document.getElementById('panelFrac');
+      const panelFracLabel = document.getElementById('panelFracLabel');
+      const btnReset = document.getElementById('btnReset');
+      const btnCopy = document.getElementById('btnCopy');
+      const sidePanel = document.getElementById('sidePanel');
+      const cv = document.getElementById('cv');
+      const handlesEl = document.getElementById('handles');
+      const snippetEl = document.getElementById('snippet');
+      const toast = document.getElementById('toast');
+      const grassTools = document.getElementById('grassTools');
+      const exportTitle = document.getElementById('exportTitle');
+      const exportHint = document.getElementById('exportHint');
+      const maskStat = document.getElementById('maskStat');
+
+      for (const id of ['water', 'grass', 'stars']) {
+        const o = document.createElement('option');
+        o.value = id;
+        o.textContent = id === 'water' ? 'Aquarium (water)' : id === 'grass' ? 'Grass (pixel mask)' : 'Starry sky (stars)';
+        sceneSelect.appendChild(o);
+      }
+
+      let scene = 'water';
+      let zone = { ...DEFAULT_UV[scene] };
+      const images = {};
+      let drag = null;
+      let grassMaskCache = null;
+
+      function loadImage(id) {
+        if (images[id]?.complete) return Promise.resolve(images[id]);
+        return new Promise((resolve, reject) => {
+          const im = new Image();
+          im.crossOrigin = 'anonymous';
+          im.onload = () => {
+            images[id] = im;
+            resolve(im);
+          };
+          im.onerror = () => reject(new Error('Failed to load ' + SRC[id]));
+          im.src = SRC[id];
+        });
+      }
+
+      function drawCover(ctx, img, destW, destH) {
+        const iw = img.naturalWidth;
+        const ih = img.naturalHeight;
+        if (!iw) return;
+        const scale = Math.max(destW / iw, destH / ih);
+        const dw = iw * scale;
+        const dh = ih * scale;
+        const dx = (destW - dw) / 2;
+        const dy = (destH - dh) / 2;
+        ctx.drawImage(img, dx, dy, dw, dh);
+      }
+
+      function syncPanelWidth() {
+        const frac = parseFloat(panelFracEl.value, 10);
+        panelFracLabel.textContent = `${Math.round(frac * 100)}% (Clocker default 30%)`;
+        sidePanel.style.width = `${frac * 100}%`;
+      }
+
+      function syncGrassLabels() {
+        document.getElementById('gBgChVal').textContent = document.getElementById('gBgCh').value;
+        document.getElementById('gSumVal').textContent = document.getElementById('gSum').value;
+        document.getElementById('gLeadRVal').textContent = document.getElementById('gLeadR').value;
+        document.getElementById('gLeadBVal').textContent = document.getElementById('gLeadB').value;
+      }
+
+      function cornerKeys() {
+        return [
+          { key: 'tl', u: 'u0', v: 'v0' },
+          { key: 'tr', u: 'u1', v: 'v0' },
+          { key: 'br', u: 'u1', v: 'v1' },
+          { key: 'bl', u: 'u0', v: 'v1' },
+        ];
+      }
+
+      const EPS = 0.02;
+
+      function clampZone() {
+        zone.u0 = Math.min(zone.u0, zone.u1 - EPS);
+        zone.u1 = Math.max(zone.u1, zone.u0 + EPS);
+        zone.v0 = Math.min(zone.v0, zone.v1 - EPS);
+        zone.v1 = Math.max(zone.v1, zone.v0 + EPS);
+        zone.u0 = Math.min(1 - EPS, Math.max(0, zone.u0));
+        zone.u1 = Math.min(1, Math.max(EPS, zone.u1));
+        zone.v0 = Math.min(1 - EPS, Math.max(0, zone.v0));
+        zone.v1 = Math.min(1, Math.max(EPS, zone.v1));
+      }
+
+      function paint() {
+        const panelW = sidePanel.clientWidth;
+        const panelH = sidePanel.clientHeight;
+        if (panelW < 4 || panelH < 4) return;
+        cv.width = panelW;
+        cv.height = panelH;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#050a14';
+        ctx.fillRect(0, 0, panelW, panelH);
+        const im = images[scene];
+        if (im?.naturalWidth) drawCover(ctx, im, panelW, panelH);
+
+        handlesEl.style.display = scene === 'grass' ? 'none' : 'block';
+
+        if (scene === 'grass' && im?.naturalWidth) {
+          const p = readGrassParams();
+          grassMaskCache = buildGrassMaskFromImageData(im, p);
+          const dim = INTRINSIC.grass;
+          const step = 5;
+          ctx.save();
+          for (let j = 0; j < grassMaskCache.h; j += step) {
+            for (let i = 0; i < grassMaskCache.w; i += step) {
+              if (!grassMaskCache.mask[j * grassMaskCache.w + i]) continue;
+              const u = (i + 0.5) / grassMaskCache.w;
+              const v = (j + 0.5) / grassMaskCache.h;
+              const pt = uvToPanelPx(u, v, panelW, panelH, dim.w, dim.h);
+              ctx.fillStyle = 'rgba(34, 197, 94, 0.35)';
+              ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
+            }
+          }
+          ctx.restore();
+          maskStat.textContent = `Mask: ${grassMaskCache.count.toLocaleString()} / ${(grassMaskCache.w * grassMaskCache.h).toLocaleString()} pixels marked as grass`;
+        } else {
+          grassMaskCache = null;
+          maskStat.textContent = '';
+          const dim = INTRINSIC[scene];
+          const p0 = uvToPanelPx(zone.u0, zone.v0, panelW, panelH, dim.w, dim.h);
+          const p1 = uvToPanelPx(zone.u1, zone.v1, panelW, panelH, dim.w, dim.h);
+          const x = Math.min(p0.x, p1.x);
+          const y = Math.min(p0.y, p1.y);
+          const rw = Math.abs(p1.x - p0.x);
+          const rh = Math.abs(p1.y - p0.y);
+          ctx.save();
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
+          ctx.strokeStyle = 'rgba(34, 197, 94, 0.95)';
+          ctx.lineWidth = Math.max(2, Math.min(panelW, panelH) * 0.006);
+          ctx.setLineDash([10, 6]);
+          ctx.fillRect(x, y, rw, rh);
+          ctx.strokeRect(x, y, rw, rh);
+          ctx.restore();
+          placeHandles(panelW, panelH, dim);
+        }
+        updateSnippet();
+      }
+
+      function placeHandles(panelW, panelH, dim) {
+        handlesEl.innerHTML = '';
+        for (const { key, u, v } of cornerKeys()) {
+          const p = uvToPanelPx(zone[u], zone[v], panelW, panelH, dim.w, dim.h);
+          const h = document.createElement('div');
+          h.className = 'handle';
+          h.dataset.key = key;
+          h.style.left = `${p.x}px`;
+          h.style.top = `${p.y}px`;
+          handlesEl.appendChild(h);
+        }
+      }
+
+      function updateSnippet() {
+        if (scene === 'grass') {
+          const p = readGrassParams();
+          exportTitle.textContent = 'Paste into App.jsx (replace the four GRASS_MASK_* constants)';
+          exportHint.textContent =
+            'Grass uses a raster mask from side-bg-grass.png — not the UV rectangle. Match the green overlay to your blob.';
+          snippetEl.textContent = `const GRASS_MASK_BG_CH = ${p.GRASS_MASK_BG_CH};\nconst GRASS_MASK_SUM_MIN = ${p.GRASS_MASK_SUM_MIN};\nconst GRASS_MASK_G_LEAD_R = ${p.GRASS_MASK_G_LEAD_R};\nconst GRASS_MASK_G_LEAD_B = ${p.GRASS_MASK_G_LEAD_B};`;
+        } else {
+          exportTitle.textContent = 'Paste into App.jsx (replace the matching scene in SIDE_PANEL_UV_HOT_ZONE)';
+          exportHint.textContent =
+            'Handles: top-left = (u₀,v₀), top-right = (u₁,v₀), bottom-right = (u₁,v₁), bottom-left = (u₀,v₁).';
+          const z = zone;
+          snippetEl.textContent = `  ${scene}: { u0: ${z.u0.toFixed(3)}, v0: ${z.v0.toFixed(3)}, u1: ${z.u1.toFixed(3)}, v1: ${z.v1.toFixed(3)} },`;
+        }
+      }
+
+      function applyPointerToCorner(clientX, clientY, key) {
+        const panelW = sidePanel.clientWidth;
+        const panelH = sidePanel.clientHeight;
+        const rect = cv.getBoundingClientRect();
+        const px = clientX - rect.left;
+        const py = clientY - rect.top;
+        const dim = INTRINSIC[scene];
+        let { u, v } = panelPxToUv(px, py, panelW, panelH, dim.w, dim.h);
+        u = Math.min(1, Math.max(0, u));
+        v = Math.min(1, Math.max(0, v));
+
+        if (key === 'tl') {
+          zone.u0 = u;
+          zone.v0 = v;
+        } else if (key === 'tr') {
+          zone.u1 = u;
+          zone.v0 = v;
+        } else if (key === 'br') {
+          zone.u1 = u;
+          zone.v1 = v;
+        } else if (key === 'bl') {
+          zone.u0 = u;
+          zone.v1 = v;
+        }
+        clampZone();
+      }
+
+      function onPointerDown(e) {
+        const t = e.target;
+        if (!t.classList?.contains('handle')) return;
+        drag = { key: t.dataset.key };
+        e.preventDefault();
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp, { once: true });
+        window.addEventListener('pointercancel', onPointerUp, { once: true });
+      }
+
+      function onPointerMove(e) {
+        if (!drag) return;
+        applyPointerToCorner(e.clientX, e.clientY, drag.key);
+        paint();
+      }
+
+      function onPointerUp() {
+        drag = null;
+        window.removeEventListener('pointermove', onPointerMove);
+      }
+
+      handlesEl.addEventListener('pointerdown', onPointerDown);
+
+      function setGrassSlidersFromDefaults() {
+        document.getElementById('gBgCh').value = String(DEFAULT_GRASS.GRASS_MASK_BG_CH);
+        document.getElementById('gSum').value = String(DEFAULT_GRASS.GRASS_MASK_SUM_MIN);
+        document.getElementById('gLeadR').value = String(DEFAULT_GRASS.GRASS_MASK_G_LEAD_R);
+        document.getElementById('gLeadB').value = String(DEFAULT_GRASS.GRASS_MASK_G_LEAD_B);
+        syncGrassLabels();
+      }
+
+      sceneSelect.addEventListener('change', async () => {
+        scene = sceneSelect.value;
+        zone = { ...DEFAULT_UV[scene] };
+        grassTools.classList.toggle('is-visible', scene === 'grass');
+        if (scene === 'grass') setGrassSlidersFromDefaults();
+        await loadImage(scene);
+        paint();
+      });
+
+      ['gBgCh', 'gSum', 'gLeadR', 'gLeadB'].forEach((id) => {
+        document.getElementById(id).addEventListener('input', () => {
+          syncGrassLabels();
+          if (scene === 'grass') paint();
+        });
+      });
+
+      panelFracEl.addEventListener('input', () => {
+        syncPanelWidth();
+        paint();
+      });
+
+      btnReset.addEventListener('click', () => {
+        if (scene === 'grass') {
+          setGrassSlidersFromDefaults();
+        } else {
+          zone = { ...DEFAULT_UV[scene] };
+        }
+        paint();
+      });
+
+      btnCopy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(snippetEl.textContent);
+          toast.classList.add('show');
+          setTimeout(() => toast.classList.remove('show'), 1600);
+        } catch {
+          window.prompt('Copy:', snippetEl.textContent);
+        }
+      });
+
+      const ro = new ResizeObserver(() => paint());
+      ro.observe(sidePanel);
+
+      syncPanelWidth();
+      syncGrassLabels();
+      grassTools.classList.toggle('is-visible', false);
+      (async () => {
+        await loadImage(scene);
+        paint();
+      })();
+    </script>
+  </body>
+</html>
