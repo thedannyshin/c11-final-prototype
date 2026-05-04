@@ -1923,6 +1923,7 @@ function DrawingPad({ onCommit, overlay = null }) {
       <div className="drawing-pad-frame">
         {overlay ? <div className="drawing-pad-overlay">{overlay}</div> : null}
         <div className="drawing-pad-bg" aria-hidden />
+        <img src="/clockit-logo-white.png" className="drawing-pad-watermark" aria-hidden alt="" />
         <canvas
           ref={canvasRef}
           className="drawing-pad"
