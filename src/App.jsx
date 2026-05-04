@@ -257,14 +257,6 @@ function sidePanelPxToUv(panelPx, panelPy, panelW, panelH, iw, ih) {
   return { u, v };
 }
 
-function clampUvToHotZone(sceneKey, u, v) {
-  const z = SIDE_PANEL_UV_HOT_ZONE[sceneKey] ?? SIDE_PANEL_UV_HOT_ZONE.water;
-  return {
-    u: Math.min(z.u1, Math.max(z.u0, u)),
-    v: Math.min(z.v1, Math.max(z.v0, v)),
-  };
-}
-
 function uvToPanelPx(u, v, panelW, panelH, iw, ih) {
   const { scale, dx, dy } = sidePanelCoverTransform(panelW, panelH, iw, ih);
   const ix = u * iw;
@@ -278,11 +270,6 @@ function sidePanelPxToImagePx(panelPx, panelPy, panelW, panelH, iw, ih) {
     ix: (panelPx - dx) / scale,
     iy: (panelPy - dy) / scale,
   };
-}
-
-function sidePanelImagePxToPanelPx(ix, iy, panelW, panelH, iw, ih) {
-  const { scale, dx, dy } = sidePanelCoverTransform(panelW, panelH, iw, ih);
-  return { x: ix * scale + dx, y: iy * scale + dy };
 }
 
 /**
@@ -301,7 +288,7 @@ function isGrassSideMaskPixel(r, g, b) {
   return g >= r + GRASS_MASK_G_LEAD_R && g >= b + GRASS_MASK_G_LEAD_B;
 }
 
-/** @typedef {{ mask: Uint8Array, w: number, h: number, cx: number, cy: number }} GrassSideMask */
+/** @typedef {{ mask: Uint8Array, w: number, h: number }} GrassSideMask */
 
 /** Built once from `side-bg-grass.png`; null until load (grass then uses UV fallback). */
 let grassSideMaskData = /** @type {GrassSideMask | null} */ (null);
@@ -323,27 +310,16 @@ function buildGrassSideMaskFromImage(img) {
     return null;
   }
   const mask = new Uint8Array(w * h);
-  let sumX = 0;
-  let sumY = 0;
-  let n = 0;
   for (let j = 0; j < h; j++) {
     for (let i = 0; i < w; i++) {
       const o = (j * w + i) * 4;
       const rv = data[o];
       const gv = data[o + 1];
       const bv = data[o + 2];
-      const on = isGrassSideMaskPixel(rv, gv, bv) ? 1 : 0;
-      mask[j * w + i] = on;
-      if (on) {
-        sumX += i + 0.5;
-        sumY += j + 0.5;
-        n += 1;
-      }
+      mask[j * w + i] = isGrassSideMaskPixel(rv, gv, bv) ? 1 : 0;
     }
   }
-  const cx = n ? sumX / n : w / 2;
-  const cy = n ? sumY / n : h / 2;
-  return { mask, w, h, cx, cy };
+  return { mask, w, h };
 }
 
 function startGrassSideMaskBuild() {
@@ -368,21 +344,6 @@ function grassPanelContains(panelPx, panelPy, panelW, panelH, maskData) {
   const dim = SIDE_PANEL_INTRINSIC_PX.grass;
   const { ix, iy } = sidePanelPxToImagePx(panelPx, panelPy, panelW, panelH, dim.w, dim.h);
   return grassMaskHit(maskData, ix, iy);
-}
-
-function grassPanelClamp(panelPx, panelPy, panelW, panelH, maskData) {
-  const dim = SIDE_PANEL_INTRINSIC_PX.grass;
-  const { ix, iy } = sidePanelPxToImagePx(panelPx, panelPy, panelW, panelH, dim.w, dim.h);
-  if (grassMaskHit(maskData, ix, iy)) return { x: panelPx, y: panelPy };
-  const { cx, cy } = maskData;
-  for (let t = 0; t <= 1; t += 0.02) {
-    const mx = ix + (cx - ix) * t;
-    const my = iy + (cy - iy) * t;
-    if (grassMaskHit(maskData, mx, my)) {
-      return sidePanelImagePxToPanelPx(mx, my, panelW, panelH, dim.w, dim.h);
-    }
-  }
-  return sidePanelImagePxToPanelPx(cx, cy, panelW, panelH, dim.w, dim.h);
 }
 
 function drawGrassSideMaskDebugOverlay(ctx, panelW, panelH) {
@@ -413,18 +374,6 @@ function sidePanelReleaseInHotZone(sceneKey, panelPx, panelPy, panelW, panelH) {
   if (!Number.isFinite(u) || !Number.isFinite(v)) return false;
   const z = SIDE_PANEL_UV_HOT_ZONE[sceneKey] ?? SIDE_PANEL_UV_HOT_ZONE.water;
   return u >= z.u0 && u <= z.u1 && v >= z.v0 && v <= z.v1;
-}
-
-function clampSidePanelDropPx(sceneKey, panelPx, panelPy, panelW, panelH) {
-  if (sceneKey === 'grass' && grassSideMaskData) {
-    return grassPanelClamp(panelPx, panelPy, panelW, panelH, grassSideMaskData);
-  }
-  const dim = SIDE_PANEL_INTRINSIC_PX[sceneKey] ?? SIDE_PANEL_INTRINSIC_PX.water;
-  const { u, v } = sidePanelPxToUv(panelPx, panelPy, panelW, panelH, dim.w, dim.h);
-  const u0 = Number.isFinite(u) ? u : 0.5;
-  const v0 = Number.isFinite(v) ? v : 0.5;
-  const c = clampUvToHotZone(sceneKey, u0, v0);
-  return uvToPanelPx(c.u, c.v, panelW, panelH, dim.w, dim.h);
 }
 
 /** Looping ambience per big-screen scene (files in /public). */
@@ -2249,7 +2198,7 @@ function ClockerView({ room, shared, onResetRoom }) {
       const canvasW = mainAquariumWidthPx();
 
       if (pos && pos.x > canvasW) {
-        // Dropped in side panel — clamp into illustrated hot zone; 5 pts if finger was outside it.
+        // Side panel: store actual release position; 10 pts in hot zone, 5 outside (still on side).
         const creature = sharedStrokesRef.current.find((s) => s.id === id);
         if (creature) {
           const panelW = window.innerWidth - canvasW;
@@ -2258,7 +2207,8 @@ function ClockerView({ room, shared, onResetRoom }) {
           const rawPx = pos.x - canvasW;
           const rawPy = pos.y;
           const inHot = sidePanelReleaseInHotZone(sceneKey, rawPx, rawPy, panelW, panelH);
-          const { x: cx, y: cy } = clampSidePanelDropPx(sceneKey, rawPx, rawPy, panelW, panelH);
+          const cx = Math.max(0, Math.min(panelW, rawPx));
+          const cy = Math.max(0, Math.min(panelH, rawPy));
           const pointDelta = inHot ? GAME_POINTS_MOVE : GAME_POINTS_MOVE_SIDE_OUTSIDE;
           setSideCreatures((prev) => [
             ...prev.filter((c) => c.id !== id),
