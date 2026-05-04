@@ -306,9 +306,9 @@ p {
 }
 
 .points-pop--participant {
-  bottom: clamp(88px, 16vh, 160px);
-  font-size: clamp(1.35rem, 5.5vw, 2rem);
-  font-weight: 800;
+  bottom: clamp(120px, 22vh, 220px);
+  font-size: clamp(3rem, 14vw, 5.5rem);
+  font-weight: 900;
   letter-spacing: 0.06em;
   color: rgba(255, 255, 255, 0.96);
   text-shadow: none;
@@ -1586,7 +1586,7 @@ p {
   gap: 8px;
   flex-shrink: 0;
   width: 100%;
-  padding: 6px 0;
+  padding: 14px 0;
 }
 
 .swatches-inline {
