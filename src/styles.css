@@ -1582,7 +1582,7 @@ p {
 
 .pad-controls {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
   flex-shrink: 0;
   width: 100%;
@@ -1591,16 +1591,15 @@ p {
 .swatches-inline {
   display: flex;
   gap: 5px;
-  flex: 1;
+  width: 100%;
   justify-content: space-between;
 }
 
 .swatch-sm {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  flex: 1;
+  height: 36px;
+  border-radius: 50px;
   border: 1.5px solid rgba(255,255,255,0.15);
-  flex-shrink: 0;
   cursor: pointer;
 }
 
@@ -1616,12 +1615,13 @@ p {
 .pad-actions {
   display: flex;
   gap: 6px;
-  flex-shrink: 0;
+  width: 100%;
 }
 
 .pad-actions .button {
+  flex: 1;
   padding: 8px 16px;
-  min-height: 36px;
+  min-height: 44px;
   font-size: 0.875rem;
   border-radius: 12px;
   background: rgba(255,255,255,0.1);
