@@ -410,9 +410,9 @@ function normalizeRoomBackground(v) {
 /** Pinch / draw overlay wording — aquarium vs grass (stars keeps generic copy). */
 function playHintLabels(sceneKey) {
   const s = normalizeRoomBackground(sceneKey);
-  if (s === 'water') return { things: 'fish', side: 'fish tank' };
-  if (s === 'grass') return { things: 'flowers', side: 'grass patch' };
-  return { things: 'creatures', side: 'right side' };
+  if (s === 'water') return { things: 'fish', side: 'fish tank', verb: 'catch' };
+  if (s === 'grass') return { things: 'flowers', side: 'grass patch', verb: 'grab' };
+  return { things: 'creatures', side: 'right side', verb: 'grab' };
 }
 
 /** Load + decode all scene images so participant/Clocker switches hit cache (important on mobile). */
@@ -2546,7 +2546,7 @@ function ClockerView({ room, shared, onResetRoom }) {
             {g.roundEndAt ? <p className="clocker-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
           </div>
           <p key={`clocker-pinch-hint-${g.phase}`} className="clocker-play-hint">
-            Pinch to catch {pinchPlayHint.things} and
+            Pinch to {pinchPlayHint.verb} {pinchPlayHint.things} and
             <br />
             move them to the {pinchPlayHint.side}.
           </p>
