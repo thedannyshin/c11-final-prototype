@@ -1945,6 +1945,18 @@ function DrawingPad({ onCommit, overlay = null }) {
   );
 }
 
+/** Home / splash — bottom-left credits (last name alphabetical). */
+function HomeScreenCredits() {
+  return (
+    <footer className="home-screen-credits">
+      <span className="home-screen-credits-heading">Credits</span>
+      <span className="home-screen-credits-list">
+        Karen-Happuch Henneh · Uyen Phan · Kyle Samonte · Danny Shin
+      </span>
+    </footer>
+  );
+}
+
 /** When the play-HUD total for the active round goes up, bump `nonce` so we can replay the hit animation. */
 function usePlayHudScoreBump(phase, team1Score, team2Score) {
   const active = phase === 'team1' || phase === 'team2';
@@ -2358,69 +2370,72 @@ function ClockerView({ room, shared, onResetRoom }) {
       <audio ref={audioRef} loop={!splashMusicPlaylistMode} preload="metadata" />
 
       {g.phase === 'splash' ? (
-        <div
-          className="clocker-flow-overlay clocker-flow-overlay--splash"
-          aria-label="ClockIt — roles and QR for artists"
-        >
-          <div className="clocker-flow-inner clocker-flow-inner--splash-card">
-            <ClockItLogo />
-            <div className="clocker-flow-splash-copy">
-              <p className="clocker-flow-splash-lead clocker-flow-splash-lead--head">2 teams · 2 players each</p>
-              <p className="clocker-flow-splash-lead">Clocker → point to move, pinch to grab</p>
-              <p className="clocker-flow-splash-lead">Artist → scan the QR code below</p>
-            </div>
-            <QRCodeSVG value={joinUrl} size={140} bgColor="transparent" fgColor="#ffffff" />
-            <div className="clocker-flow-scene">
-              <p className="clocker-flow-scene-heading" id="clocker-splash-scene-label">
-                Pick your stage
-              </p>
-              <div
-                className="clocker-flow-scene-picker"
-                role="group"
-                aria-labelledby="clocker-splash-scene-label"
-              >
-                {CLOCKER_SCENE_OPTIONS.map(({ id, label }) => {
-                  const chosen =
-                    splashBgChosen && normalizeRoomBackground(shared.roomBackground) === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      className={`clocker-flow-scene-thumb${chosen ? ' clocker-flow-scene-thumb--selected' : ''}`}
-                      aria-pressed={chosen}
-                      onClick={() => {
-                        shared.setRoomBackground(id);
-                        setSplashBgChosen(true);
-                        setPlaying(true);
-                      }}
-                    >
-                      <span
-                        className="clocker-flow-scene-thumb-visual"
-                        style={{ backgroundImage: `url('${CLOCKER_BG_BY_SCENE[id]}')` }}
-                        aria-hidden
-                      />
-                      <span className="clocker-flow-scene-thumb-caption">{label}</span>
-                    </button>
-                  );
-                })}
+        <>
+          <div
+            className="clocker-flow-overlay clocker-flow-overlay--splash"
+            aria-label="ClockIt — roles and QR for artists"
+          >
+            <div className="clocker-flow-inner clocker-flow-inner--splash-card">
+              <ClockItLogo />
+              <div className="clocker-flow-splash-copy">
+                <p className="clocker-flow-splash-lead clocker-flow-splash-lead--head">2 teams · 2 players each</p>
+                <p className="clocker-flow-splash-lead">Clocker → point to move, pinch to grab</p>
+                <p className="clocker-flow-splash-lead">Artist → scan the QR code below</p>
+              </div>
+              <QRCodeSVG value={joinUrl} size={140} bgColor="transparent" fgColor="#ffffff" />
+              <div className="clocker-flow-scene">
+                <p className="clocker-flow-scene-heading" id="clocker-splash-scene-label">
+                  Pick your stage
+                </p>
+                <div
+                  className="clocker-flow-scene-picker"
+                  role="group"
+                  aria-labelledby="clocker-splash-scene-label"
+                >
+                  {CLOCKER_SCENE_OPTIONS.map(({ id, label }) => {
+                    const chosen =
+                      splashBgChosen && normalizeRoomBackground(shared.roomBackground) === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`clocker-flow-scene-thumb${chosen ? ' clocker-flow-scene-thumb--selected' : ''}`}
+                        aria-pressed={chosen}
+                        onClick={() => {
+                          shared.setRoomBackground(id);
+                          setSplashBgChosen(true);
+                          setPlaying(true);
+                        }}
+                      >
+                        <span
+                          className="clocker-flow-scene-thumb-visual"
+                          style={{ backgroundImage: `url('${CLOCKER_BG_BY_SCENE[id]}')` }}
+                          aria-hidden
+                        />
+                        <span className="clocker-flow-scene-thumb-caption">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="clocker-flow-actions clocker-flow-actions--single">
+                <button
+                  type="button"
+                  className="clocker-flow-action-btn"
+                  disabled={!splashBgChosen}
+                  title={splashBgChosen ? undefined : 'Pick a stage first'}
+                  onClick={() => {
+                    setHandEnabled(true);
+                    shared.gamePlayFromSplash();
+                  }}
+                >
+                  Play
+                </button>
               </div>
             </div>
-            <div className="clocker-flow-actions clocker-flow-actions--single">
-              <button
-                type="button"
-                className="clocker-flow-action-btn"
-                disabled={!splashBgChosen}
-                title={splashBgChosen ? undefined : 'Pick a stage first'}
-                onClick={() => {
-                  setHandEnabled(true);
-                  shared.gamePlayFromSplash();
-                }}
-              >
-                Play
-              </button>
-            </div>
           </div>
-        </div>
+          <HomeScreenCredits />
+        </>
       ) : null}
 
       {(g.phase === 'countdown_team1' || g.phase === 'countdown_team2') ? (
@@ -2701,25 +2716,28 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
       {gm.phase === 'splash' ? <ParticipantSplashBackdrop active /> : null}
 
       {gm.phase === 'splash' ? (
-        <div className="participant-flow-overlay participant-flow-overlay--splash">
-          <div className="participant-flow-inner participant-flow-inner--splash-card">
-            <ClockItLogo variant="phone" />
-            <p className="participant-assigned-team" role="status" aria-live="polite">
-              {assignedTeam === 1 || assignedTeam === 2 ? (
-                <>
-                  You&apos;re on <strong>Team {assignedTeam}</strong>
-                </>
-              ) : shared.participants?.[clientId] ? (
-                <>
-                  This room already has <strong>two players</strong> (one per team). Watch the Clocker screen — you
-                  won&apos;t draw from this phone.
-                </>
-              ) : (
-                <>Joining room…</>
-              )}
-            </p>
+        <>
+          <div className="participant-flow-overlay participant-flow-overlay--splash">
+            <div className="participant-flow-inner participant-flow-inner--splash-card">
+              <ClockItLogo variant="phone" />
+              <p className="participant-assigned-team" role="status" aria-live="polite">
+                {assignedTeam === 1 || assignedTeam === 2 ? (
+                  <>
+                    You&apos;re on <strong>Team {assignedTeam}</strong>
+                  </>
+                ) : shared.participants?.[clientId] ? (
+                  <>
+                    This room already has <strong>two players</strong> (one per team). Watch the Clocker screen — you
+                    won&apos;t draw from this phone.
+                  </>
+                ) : (
+                  <>Joining room…</>
+                )}
+              </p>
+            </div>
           </div>
-        </div>
+          <HomeScreenCredits />
+        </>
       ) : null}
 
       {(gm.phase === 'countdown_team1' || gm.phase === 'countdown_team2') ? (
@@ -2853,6 +2871,7 @@ function JoinLandingView() {
           </p>
         </div>
       </div>
+      <HomeScreenCredits />
     </div>
   );
 }

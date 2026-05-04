@@ -449,6 +449,42 @@ p {
   pointer-events: none;
 }
 
+/* Home / splash — bottom-left credits (Clocker + participant + join landing). */
+.home-screen-credits {
+  position: fixed;
+  z-index: 112;
+  left: max(14px, env(safe-area-inset-left));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  max-width: min(calc(100vw - 28px), 22rem);
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: inherit;
+  font-size: clamp(0.65rem, 1.9vw, 0.78rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.52);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  user-select: none;
+}
+
+.home-screen-credits-heading {
+  text-transform: uppercase;
+  font-size: 0.68em;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.home-screen-credits-list {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .clocker-flow-inner--splash-card {
   pointer-events: auto;
   width: 100%;
