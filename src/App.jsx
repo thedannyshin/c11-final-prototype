@@ -22,6 +22,8 @@ const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
 const GAME_ROUND_MS = 2 * 60 * 1000;
 const GAME_POINTS_DRAW = 10;
 const GAME_POINTS_MOVE = 10;
+/** Relocate to side panel but outside the illustrated “hot” zone (tank / grass patch). */
+const GAME_POINTS_MOVE_SIDE_OUTSIDE = 5;
 
 /** Firebase RTDB rooms/{id} deleted if meta.touchedAt missing (legacy) or older than this. */
 const ROOM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -173,6 +175,78 @@ const SIDE_PANEL_CREATURE_GLOW_BY_SCENE = {
   grass: 'rgba(52, 211, 153, 0.5)',
   stars: 'rgba(199, 210, 254, 0.55)',
 };
+/** Intrinsic pixel size of each side background (must match files in /public). */
+const SIDE_PANEL_INTRINSIC_PX = {
+  water: { w: 580, h: 1024 },
+  grass: { w: 580, h: 1024 },
+  stars: { w: 1920, h: 1240 },
+};
+/**
+ * Hot zones in normalised image UV space (0–1) for side-panel drops — matches cover-fit art.
+ * Water/grass tuned for 580×1024 portrait side assets; stars = full frame.
+ */
+const SIDE_PANEL_UV_HOT_ZONE = {
+  water: { u0: 0.1, v0: 0.36, u1: 0.9, v1: 0.97 },
+  grass: { u0: 0.14, v0: 0.28, u1: 0.86, v1: 0.84 },
+  stars: { u0: 0, v0: 0, u1: 1, v1: 1 },
+};
+
+function sidePanelCoverTransform(panelW, panelH, iw, ih) {
+  const scale = Math.max(panelW / iw, panelH / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  const dx = (panelW - dw) / 2;
+  const dy = (panelH - dh) / 2;
+  return { scale, dx, dy };
+}
+
+function sidePanelPxToUv(panelPx, panelPy, panelW, panelH, iw, ih) {
+  const { scale, dx, dy } = sidePanelCoverTransform(panelW, panelH, iw, ih);
+  const u = (panelPx - dx) / scale / iw;
+  const v = (panelPy - dy) / scale / ih;
+  return { u, v };
+}
+
+function clampUvToHotZone(sceneKey, u, v) {
+  const z = SIDE_PANEL_UV_HOT_ZONE[sceneKey] ?? SIDE_PANEL_UV_HOT_ZONE.water;
+  return {
+    u: Math.min(z.u1, Math.max(z.u0, u)),
+    v: Math.min(z.v1, Math.max(z.v0, v)),
+  };
+}
+
+function uvToPanelPx(u, v, panelW, panelH, iw, ih) {
+  const { scale, dx, dy } = sidePanelCoverTransform(panelW, panelH, iw, ih);
+  const ix = u * iw;
+  const iy = v * ih;
+  return { x: ix * scale + dx, y: iy * scale + dy };
+}
+
+function sidePanelReleaseInHotZone(sceneKey, panelPx, panelPy, panelW, panelH) {
+  const dim = SIDE_PANEL_INTRINSIC_PX[sceneKey] ?? SIDE_PANEL_INTRINSIC_PX.water;
+  const { u, v } = sidePanelPxToUv(panelPx, panelPy, panelW, panelH, dim.w, dim.h);
+  if (!Number.isFinite(u) || !Number.isFinite(v)) return false;
+  const z = SIDE_PANEL_UV_HOT_ZONE[sceneKey] ?? SIDE_PANEL_UV_HOT_ZONE.water;
+  return u >= z.u0 && u <= z.u1 && v >= z.v0 && v <= z.v1;
+}
+
+function clampSidePanelDropPx(sceneKey, panelPx, panelPy, panelW, panelH) {
+  const dim = SIDE_PANEL_INTRINSIC_PX[sceneKey] ?? SIDE_PANEL_INTRINSIC_PX.water;
+  const { u, v } = sidePanelPxToUv(panelPx, panelPy, panelW, panelH, dim.w, dim.h);
+  const u0 = Number.isFinite(u) ? u : 0.5;
+  const v0 = Number.isFinite(v) ? v : 0.5;
+  const c = clampUvToHotZone(sceneKey, u0, v0);
+  return uvToPanelPx(c.u, c.v, panelW, panelH, dim.w, dim.h);
+}
+
+/** While dragging onto the side column, draw the creature clamped inside the scene hot zone. */
+function clampScreenPosForSideDrag(sceneKey, screenX, screenY, mainW, panelH) {
+  const panelW = window.innerWidth - mainW;
+  if (screenX <= mainW || panelW <= 0) return { x: screenX, y: screenY };
+  const { x, y } = clampSidePanelDropPx(sceneKey, screenX - mainW, screenY, panelW, panelH);
+  return { x: mainW + x, y };
+}
+
 /** Looping ambience per big-screen scene (files in /public). */
 const CLOCKER_MUSIC_BY_SCENE = {
   water: '/under-the-sea.mp3',
@@ -1089,17 +1163,20 @@ function useSharedRoom(roomId, client) {
       }
     },
     clearCanvas: sendCanvasClear,
-    awardRelocatePoints() {
+    awardRelocatePoints(delta = GAME_POINTS_MOVE) {
       const g = gameRef.current;
+      const d = Number(delta);
+      const safeDelta =
+        Number.isFinite(d) && d > 0 ? Math.floor(d) : GAME_POINTS_MOVE;
       if (g.phase === 'team1') {
         transportRef.current?.send({
           type: 'game:increment',
-          payload: { team: 1, delta: GAME_POINTS_MOVE },
+          payload: { team: 1, delta: safeDelta },
         });
       } else if (g.phase === 'team2') {
         transportRef.current?.send({
           type: 'game:increment',
-          payload: { team: 2, delta: GAME_POINTS_MOVE },
+          payload: { team: 2, delta: safeDelta },
         });
       }
     },
@@ -1772,11 +1849,17 @@ function ClockerView({ room, shared, onResetRoom }) {
   /** While on splash with no background yet: play each scene’s music file to completion, then the next */
   const [splashPreSelectMusicIdx, setSplashPreSelectMusicIdx] = useState(0);
   const [relocatePointsPop, setRelocatePointsPop] = useState(0);
+  const [relocatePointsDelta, setRelocatePointsDelta] = useState(GAME_POINTS_MOVE);
   const [splashRotateIdx, setSplashRotateIdx] = useState(0);
   const prevPhaseForSplashRef = useRef(shared.game.phase);
   const hudIdleTimerRef = useRef(null);
   const bumpRelocatePointsPopRef = useRef(() => {});
-  bumpRelocatePointsPopRef.current = () => setRelocatePointsPop((n) => n + 1);
+  bumpRelocatePointsPopRef.current = (delta) => {
+    setRelocatePointsDelta(
+      typeof delta === 'number' && delta > 0 ? delta : GAME_POINTS_MOVE,
+    );
+    setRelocatePointsPop((n) => n + 1);
+  };
 
   musicVolumeRef.current = musicVolume;
 
@@ -1900,8 +1983,25 @@ function ClockerView({ room, shared, onResetRoom }) {
     setSideCreatures([]);
   }, [shared.strokes.length]);
 
+  const gPhase = shared.game.phase;
+  const displayScene =
+    gPhase === 'splash' && !splashBgChosen
+      ? CLOCKER_SCENE_OPTIONS[splashRotateIdx].id
+      : normalizeRoomBackground(shared.roomBackground);
+  const displaySceneRef = useRef(displayScene);
+  displaySceneRef.current = displayScene;
+
   // ── Hand tracking ─────────────────────────────────────────────────────────
   const { fingertipPos, pinchCbRef } = useHandTracking(handEnabled, cameraDeviceId);
+
+  const heldDrawPos = useMemo(() => {
+    if (!fingertipPos || !heldCreature) return fingertipPos;
+    const mw = mainAquariumWidthPx();
+    const H = window.innerHeight;
+    if (fingertipPos.x <= mw) return fingertipPos;
+    const sceneKey = normalizeRoomBackground(displayScene);
+    return clampScreenPosForSideDrag(sceneKey, fingertipPos.x, fingertipPos.y, mw, H);
+  }, [fingertipPos, heldCreature, displayScene]);
 
   // Keep heldPos in sync with the fingertip while dragging.
   useEffect(() => {
@@ -1947,17 +2047,25 @@ function ClockerView({ room, shared, onResetRoom }) {
       const canvasW = mainAquariumWidthPx();
 
       if (pos && pos.x > canvasW) {
-        // Dropped in side panel — store drop position relative to panel left edge.
+        // Dropped in side panel — clamp into illustrated hot zone; 5 pts if finger was outside it.
         const creature = sharedStrokesRef.current.find((s) => s.id === id);
         if (creature) {
+          const panelW = window.innerWidth - canvasW;
+          const panelH = window.innerHeight;
+          const sceneKey = normalizeRoomBackground(displaySceneRef.current);
+          const rawPx = pos.x - canvasW;
+          const rawPy = pos.y;
+          const inHot = sidePanelReleaseInHotZone(sceneKey, rawPx, rawPy, panelW, panelH);
+          const { x: cx, y: cy } = clampSidePanelDropPx(sceneKey, rawPx, rawPy, panelW, panelH);
+          const pointDelta = inHot ? GAME_POINTS_MOVE : GAME_POINTS_MOVE_SIDE_OUTSIDE;
           setSideCreatures((prev) => [
             ...prev.filter((c) => c.id !== id),
-            { ...creature, dropX: pos.x - canvasW, dropY: pos.y },
+            { ...creature, dropX: cx, dropY: cy },
           ]);
           hiddenIdsRef.current = new Set([...hiddenIdsRef.current, id]);
           setHiddenIds(new Set(hiddenIdsRef.current));
-          sharedRef.current.awardRelocatePoints();
-          bumpRelocatePointsPopRef.current();
+          sharedRef.current.awardRelocatePoints(pointDelta);
+          bumpRelocatePointsPopRef.current(pointDelta);
         }
       } else if (pos) {
         // Dropped in main aquarium — teleport creature to drop position.
@@ -1973,8 +2081,6 @@ function ClockerView({ room, shared, onResetRoom }) {
       setHeldCreature(null);
     };
   }, []);
-
-  const gPhase = shared.game.phase;
 
   useEffect(() => {
     if (gPhase === 'splash' && prevPhaseForSplashRef.current !== 'splash') {
@@ -1992,11 +2098,6 @@ function ClockerView({ room, shared, onResetRoom }) {
     }, 4500);
     return () => window.clearInterval(t);
   }, [gPhase, splashBgChosen]);
-
-  const displayScene =
-    gPhase === 'splash' && !splashBgChosen
-      ? CLOCKER_SCENE_OPTIONS[splashRotateIdx].id
-      : normalizeRoomBackground(shared.roomBackground);
 
   const splashMusicPlaylistMode = gPhase === 'splash' && !splashBgChosen;
   const musicSceneForAudio = splashMusicPlaylistMode
@@ -2221,7 +2322,7 @@ function ClockerView({ room, shared, onResetRoom }) {
 
       {relocatePointsPop > 0 ? (
         <span key={relocatePointsPop} className="points-pop points-pop--clocker" aria-hidden>
-          +{GAME_POINTS_MOVE}
+          +{relocatePointsDelta}
         </span>
       ) : null}
 
@@ -2331,7 +2432,7 @@ function ClockerView({ room, shared, onResetRoom }) {
       </div>
       ) : null}
 
-      <HeldCreatureOverlay creature={heldCreature} pos={fingertipPos} />
+      <HeldCreatureOverlay creature={heldCreature} pos={heldDrawPos} />
 
       {fingertipPos && handEnabled && (
         <div
