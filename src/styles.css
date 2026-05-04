@@ -1399,6 +1399,45 @@ p {
   -webkit-backdrop-filter: blur(10px);
 }
 
+/* Landscape rotation prompt — covers everything, only shown during draw round. */
+.rotate-prompt {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: rgba(2, 5, 10, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.rotate-prompt-icon {
+  font-size: clamp(3rem, 12vw, 5rem);
+  animation: rotate-prompt-spin 1.8s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes rotate-prompt-spin {
+  0%   { transform: rotate(0deg); }
+  40%  { transform: rotate(-90deg); }
+  60%  { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.rotate-prompt-text {
+  margin: 0;
+  font-size: clamp(1.1rem, 4vw, 1.5rem);
+  font-weight: 800;
+  color: #fff;
+  text-align: center;
+  padding: 0 24px;
+  -webkit-text-stroke: clamp(2.75px, 0.16em, 8px) #030508;
+  paint-order: stroke fill;
+}
+
 /* Drawer play HUD — mirrors Clocker row: active team | score | timer */
 .participant-play-hud {
   position: relative;

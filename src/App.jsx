@@ -2681,11 +2681,28 @@ function ClockerView({ room, shared, onResetRoom }) {
   );
 }
 
+function useIsLandscape() {
+  const [landscape, setLandscape] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth > window.innerHeight,
+  );
+  useEffect(() => {
+    const update = () => setLandscape(window.innerWidth > window.innerHeight);
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+  return landscape;
+}
+
 function ParticipantView({ shared, clientName, setClientName, clientColor, clientId, onExitToJoinHome }) {
   const [, forceClockTick] = useState(0);
   const [sendPointsPop, setSendPointsPop] = useState(0);
   const [lastDrawDelta, setLastDrawDelta] = useState(GAME_POINTS_DRAW_MULTI_COLOR);
   const stuckExitDoneRef = useRef(false);
+  const isLandscape = useIsLandscape();
   const scene = normalizeRoomBackground(shared.roomBackground);
   const drawPlayHint = playHintLabels(scene);
   const bgUrl = CLOCKER_BG_BY_SCENE[scene] ?? CLOCKER_BG_BY_SCENE.water;
@@ -2886,6 +2903,13 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
             </span>
           ) : null}
         </>
+      ) : null}
+
+      {isLandscape && inDrawRound ? (
+        <div className="rotate-prompt" aria-live="assertive">
+          <span className="rotate-prompt-icon">⟳</span>
+          <p className="rotate-prompt-text">Please rotate your phone back to portrait</p>
+        </div>
       ) : null}
     </div>
   );
