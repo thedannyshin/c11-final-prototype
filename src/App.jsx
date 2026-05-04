@@ -2546,7 +2546,7 @@ function ClockerView({ room, shared, onResetRoom }) {
             {g.roundEndAt ? <p className="clocker-play-timer">{formatRoundClock(g.roundEndAt)}</p> : null}
           </div>
           <p key={`clocker-pinch-hint-${g.phase}`} className="clocker-play-hint">
-            Pinch to grab {pinchPlayHint.things} and
+            Pinch to catch {pinchPlayHint.things} and
             <br />
             move them to the {pinchPlayHint.side}.
           </p>
