@@ -2637,7 +2637,9 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
 
   return (
     <div
-      className={`participant-shell${gm.phase === 'splash' ? ' participant-shell--splash-mode' : ''}`}
+      className={`participant-shell${gm.phase === 'splash' ? ' participant-shell--splash-mode' : ''}${
+        inDrawRound && myTurnToDraw ? ' participant-shell--draw-pad' : ''
+      }`}
       data-scene={scene}
       data-my-team={assignedTeam == null ? 'none' : String(assignedTeam)}
       style={{ '--participant-shell-bg': `url('${bgUrl}')` }}

@@ -1288,6 +1288,14 @@ p {
   background-image: none;
 }
 
+/* Draw round: dark scrim outside pad only — same base as Clocker 3-2-1 (.clocker-flow-overlay--countdown). */
+.participant-shell.participant-shell--draw-pad {
+  background-image: none;
+  background-color: rgba(2, 5, 10, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 /* Drawer play HUD — mirrors Clocker row: active team | score | timer */
 .participant-play-hud {
   position: relative;
