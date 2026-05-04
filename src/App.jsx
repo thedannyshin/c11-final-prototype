@@ -154,6 +154,18 @@ const CLOCKER_BG_BY_SCENE = {
   grass: '/bg-grass.png',
   stars: '/bg-starry.jpg',
 };
+/** Side showcase column art (portrait-friendly); main tank still uses CLOCKER_BG_BY_SCENE. */
+const CLOCKER_SIDE_BG_BY_SCENE = {
+  water: '/side-bg-water.png',
+  grass: '/side-bg-grass.png',
+  stars: '/bg-starry.jpg',
+};
+/** Letterbox fill behind contain-fit side art (matches each asset’s flat background). */
+const SIDE_PANEL_LETTERBOX_BY_SCENE = {
+  water: '#c8e4f5',
+  grass: '#ffffff',
+  stars: '#050a14',
+};
 /** Looping ambience per big-screen scene (files in /public). */
 const CLOCKER_MUSIC_BY_SCENE = {
   water: '/under-the-sea.mp3',
@@ -178,7 +190,8 @@ function normalizeRoomBackground(v) {
 
 /** Load + decode all scene images so participant/Clocker switches hit cache (important on mobile). */
 function preloadSceneBackgroundArt() {
-  Object.values(CLOCKER_BG_BY_SCENE).forEach((src) => {
+  const urls = new Set([...Object.values(CLOCKER_BG_BY_SCENE), ...Object.values(CLOCKER_SIDE_BG_BY_SCENE)]);
+  urls.forEach((src) => {
     const img = new Image();
     img.onload = () => {
       img.decode?.().catch(() => {});
@@ -356,6 +369,20 @@ function drawCoverImage(ctx, img, destW, destH) {
   const iw = img.naturalWidth;
   const ih = img.naturalHeight;
   const scale = Math.max(destW / iw, destH / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  const dx = (destW - dw) / 2;
+  const dy = (destH - dh) / 2;
+  ctx.drawImage(img, dx, dy, dw, dh);
+  return true;
+}
+
+/** Contain-fit (full image visible, letterboxing). */
+function drawContainImage(ctx, img, destW, destH) {
+  if (!img?.naturalWidth) return false;
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const scale = Math.min(destW / iw, destH / ih);
   const dw = iw * scale;
   const dh = ih * scale;
   const dx = (destW - dw) / 2;
@@ -1441,10 +1468,15 @@ function SideAquarium({ creatures, scene = 'water' }) {
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
-    const src = CLOCKER_BG_BY_SCENE[scene] || CLOCKER_BG_BY_SCENE.water;
+    const src =
+      CLOCKER_SIDE_BG_BY_SCENE[scene] || CLOCKER_SIDE_BG_BY_SCENE.water;
+    const letterbox =
+      SIDE_PANEL_LETTERBOX_BY_SCENE[scene] || SIDE_PANEL_LETTERBOX_BY_SCENE.water;
 
     const paint = (img) => {
-      if (!img || !drawCoverImage(ctx, img, W, H)) {
+      ctx.fillStyle = letterbox;
+      ctx.fillRect(0, 0, W, H);
+      if (!img || !drawContainImage(ctx, img, W, H)) {
         const bg = ctx.createLinearGradient(0, 0, 0, H);
         bg.addColorStop(0, '#0a1a30');
         bg.addColorStop(1, '#050e18');
