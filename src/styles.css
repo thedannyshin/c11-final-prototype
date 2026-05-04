@@ -476,13 +476,13 @@ p {
   text-transform: uppercase;
   font-size: 0.68em;
   letter-spacing: 0.14em;
-  color: #fff;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .home-screen-credits-list {
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: #fff;
+  color: rgba(255, 255, 255, 0.8);
   white-space: nowrap;
 }
 
