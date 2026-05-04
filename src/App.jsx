@@ -412,7 +412,7 @@ function playHintLabels(sceneKey) {
   const s = normalizeRoomBackground(sceneKey);
   if (s === 'water') return { things: 'fish', side: 'fish tank', verb: 'catch' };
   if (s === 'grass') return { things: 'flowers', side: 'grass patch', verb: 'grab' };
-  return { things: 'creatures', side: 'right side', verb: 'grab' };
+  return { things: 'stars', side: 'the jar', verb: 'grab' };
 }
 
 /** Load + decode all scene images so participant/Clocker switches hit cache (important on mobile). */
