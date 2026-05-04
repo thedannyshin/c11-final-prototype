@@ -403,7 +403,7 @@ function normalizeRoomBackground(v) {
 /** Pinch / draw overlay wording — aquarium vs grass (stars keeps generic copy). */
 function playHintLabels(sceneKey) {
   const s = normalizeRoomBackground(sceneKey);
-  if (s === 'water') return { things: 'fishes', side: 'fish tank' };
+  if (s === 'water') return { things: 'fish', side: 'fish tank' };
   if (s === 'grass') return { things: 'flowers', side: 'grass patch' };
   return { things: 'creatures', side: 'right side' };
 }
