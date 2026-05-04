@@ -236,7 +236,7 @@
       <div class="grass-tools" id="grassTools">
         <label title="Treat RGB all above this as white paper (not grass)">
           BG_CH
-          <input type="range" id="gBgCh" min="220" max="255" step="1" value="246" />
+          <input type="range" id="gBgCh" min="220" max="255" step="1" value="255" />
           <span id="gBgChVal"></span>
         </label>
         <label title="If R+G+B above this, not grass (bright paper)">
@@ -246,12 +246,12 @@
         </label>
         <label title="Grass: G >= R + this (often negative)">
           G_LEAD_R
-          <input type="range" id="gLeadR" min="-40" max="25" step="1" value="-10" />
+          <input type="range" id="gLeadR" min="-40" max="25" step="1" value="-40" />
           <span id="gLeadRVal"></span>
         </label>
         <label title="Grass: G >= B + this">
           G_LEAD_B
-          <input type="range" id="gLeadB" min="-15" max="45" step="1" value="5" />
+          <input type="range" id="gLeadB" min="-15" max="45" step="1" value="-15" />
           <span id="gLeadBVal"></span>
         </label>
         <span class="mask-stat" id="maskStat"></span>
@@ -284,15 +284,15 @@
         stars: '/bg-starry.jpg',
       };
       const DEFAULT_UV = {
-        water: { u0: 0.08, v0: 0.18, u1: 0.92, v1: 0.97 },
+        water: { u0: 0.197, v0: 0.418, u1: 0.808, v1: 0.645 },
         grass: { u0: 0.12, v0: 0.22, u1: 0.88, v1: 0.86 },
         stars: { u0: 0, v0: 0, u1: 1, v1: 1 },
       };
       const DEFAULT_GRASS = {
-        GRASS_MASK_BG_CH: 246,
+        GRASS_MASK_BG_CH: 255,
         GRASS_MASK_SUM_MIN: 736,
-        GRASS_MASK_G_LEAD_R: -10,
-        GRASS_MASK_G_LEAD_B: 5,
+        GRASS_MASK_G_LEAD_R: -40,
+        GRASS_MASK_G_LEAD_B: -15,
       };
 
       function getPreviewFit() {

@@ -188,8 +188,7 @@ const SIDE_PANEL_INTRINSIC_PX = {
  * Debug overlay: add ?sideHotZone=1 to the Clocker URL.
  */
 const SIDE_PANEL_UV_HOT_ZONE = {
-  /* v0 must include the tank lid / top glass — too high a v0 blocks moving above the tank body */
-  water: { u0: 0.08, v0: 0.18, u1: 0.92, v1: 0.97 },
+  water: { u0: 0.197, v0: 0.418, u1: 0.808, v1: 0.645 },
   grass: { u0: 0.12, v0: 0.22, u1: 0.88, v1: 0.86 },
   stars: { u0: 0, v0: 0, u1: 1, v1: 1 },
 };
@@ -290,10 +289,10 @@ function sidePanelImagePxToPanelPx(ix, iy, panelW, panelH, iw, ih) {
  * Grass side art is an irregular blob on white — we rasterise a mask instead of a UV rectangle.
  * Tune in /side-hot-zone-tuner/ (grass mode) and paste the four numbers back here.
  */
-const GRASS_MASK_BG_CH = 246;
+const GRASS_MASK_BG_CH = 255;
 const GRASS_MASK_SUM_MIN = 736;
-const GRASS_MASK_G_LEAD_R = -10;
-const GRASS_MASK_G_LEAD_B = 5;
+const GRASS_MASK_G_LEAD_R = -40;
+const GRASS_MASK_G_LEAD_B = -15;
 
 function isGrassSideMaskPixel(r, g, b) {
   const sum = r + g + b;
