@@ -2554,7 +2554,11 @@ function ClockerView({ room, shared, onResetRoom }) {
       ) : null}
 
       {relocatePointsPop > 0 ? (
-        <span key={relocatePointsPop} className="points-pop points-pop--clocker" aria-hidden>
+        <span
+          key={relocatePointsPop}
+          className={`points-pop points-pop--clocker${relocatePointsDelta >= 10 ? ' points-pop--high' : ' points-pop--low'}`}
+          aria-hidden
+        >
           +{relocatePointsDelta}
         </span>
       ) : null}
@@ -2873,7 +2877,11 @@ function ParticipantView({ shared, clientName, setClientName, clientColor, clien
             />
           )}
           {myTurnToDraw && sendPointsPop > 0 ? (
-            <span key={sendPointsPop} className="points-pop points-pop--participant" aria-hidden>
+            <span
+              key={sendPointsPop}
+              className={`points-pop points-pop--participant${lastDrawDelta >= 10 ? ' points-pop--high' : ' points-pop--low'}`}
+              aria-hidden
+            >
               +{lastDrawDelta}
             </span>
           ) : null}

@@ -316,6 +316,16 @@ p {
   paint-order: stroke fill;
 }
 
+
+/* 10-pt pop: blue; 5-pt pop: yellow-green */
+.points-pop--high {
+  color: #259dca;
+}
+
+.points-pop--low {
+  color: #b1c941;
+}
+
 /* Triple “bam” scale on play HUD total when points go up (host + participant). */
 @keyframes play-score-total-bump {
   0% {
