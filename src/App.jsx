@@ -20,7 +20,7 @@ const COLORS = ['#FFFFFF', '#00D4FF', '#F43F5E', '#10B981', '#FBBF24', '#A78BFA'
 const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
 
 const GAME_ROUND_MS = 2 * 60 * 1000;
-/** If time is up but the Clocker never advanced phase (tab closed / lost), artist returns to join home after this wait. */
+/** If time is up but the Clocker never advanced phase (tab closed / lost), participant returns to join home after this wait. */
 const PARTICIPANT_STUCK_ROUND_GRACE_MS = 5000;
 const GAME_POINTS_DRAW_MULTI_COLOR = 10;
 const GAME_POINTS_DRAW_SINGLE_COLOR = 5;
@@ -415,7 +415,7 @@ function playHintLabels(sceneKey) {
   return { things: 'stars', side: 'the jar', verb: 'grab' };
 }
 
-/** Load + decode all scene images so artist/Clocker switches hit cache (important on mobile). */
+/** Load + decode all scene images so participant/Clocker switches hit cache (important on mobile). */
 function preloadSceneBackgroundArt() {
   const urls = new Set([...Object.values(CLOCKER_BG_BY_SCENE), ...Object.values(CLOCKER_SIDE_BG_BY_SCENE)]);
   urls.forEach((src) => {
@@ -646,10 +646,10 @@ function getJoinUrl(room) {
   return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(room)}&mode=artist`;
 }
 
-/** Roster: sorted artist clientIds → first = Team 1, second = Team 2; max one phone per team (2 total). */
-function computeAutoArtistTeam(clientId, artists) {
-  const ids = Object.keys(artists || {})
-    .filter((id) => (artists[id]?.role || '') === 'artist')
+/** Roster: sorted participant clientIds → first = Team 1, second = Team 2; max one phone per team (2 total). */
+function computeAutoArtistTeam(clientId, participants) {
+  const ids = Object.keys(participants || {})
+    .filter((id) => (participants[id]?.role || '') === 'artist')
     .sort();
   const idx = ids.indexOf(clientId);
   if (idx < 0) return null;
@@ -657,7 +657,7 @@ function computeAutoArtistTeam(clientId, artists) {
   return idx === 0 ? 1 : 2;
 }
 
-/** True for phone / tablet widths; wide screens default to Clocker, narrow to artist when URL does not specify. */
+/** True for phone / tablet widths; wide screens default to Clocker, narrow to participant when URL does not specify. */
 function isMobileViewport() {
   if (typeof window === 'undefined') return false;
   return window.matchMedia('(max-width: 1024px)').matches;
@@ -667,12 +667,9 @@ let cachedInitialAppState = null;
 function getInitialAppStateOnce() {
   if (cachedInitialAppState === null) {
     const { room: urlRoom, mode: urlModeRaw } = getUrlState();
-    // Normalise legacy mode values: host→clocker, participant→artist.
-    const urlMode = urlModeRaw === 'host' ? CLOCKER_URL_MODE
-      : urlModeRaw === 'participant' ? 'artist'
-      : urlModeRaw;
+    const urlMode = urlModeRaw === 'host' ? CLOCKER_URL_MODE : urlModeRaw;
     const modePinned =
-      urlModeRaw === 'host' || urlModeRaw === 'participant' || urlMode === CLOCKER_URL_MODE || urlMode === 'artist';
+      urlModeRaw === 'host' || urlMode === CLOCKER_URL_MODE || urlModeRaw === 'artist';
     const mobile = isMobileViewport();
 
     if (modePinned) {
@@ -857,11 +854,11 @@ function createTransport(roomId) {
   });
 
   const unsubPresence = onValue(presenceRef, (snapshot) => {
-    const artists = {};
+    const participants = {};
     snapshot.forEach((child) => {
-      if (child.val()) artists[child.key] = { ...child.val(), lastSeen: Date.now() };
+      if (child.val()) participants[child.key] = { ...child.val(), lastSeen: Date.now() };
     });
-    handle({ type: 'room:state', payload: { artists } });
+    handle({ type: 'room:state', payload: { participants } });
   });
 
   const unsubSettingsBg = onValue(settingsBgRef, (snapshot) => {
@@ -1132,11 +1129,11 @@ function useHandTracking(enabled, cameraDeviceId = '') {
 }
 
 // ---------------------------------------------------------------------------
-// Shared room hook — manages strokes (now characters) + artists.
+// Shared room hook — manages strokes (now characters) + participants.
 // ---------------------------------------------------------------------------
 function useSharedRoom(roomId, client) {
   const [strokes, setStrokes] = useState([]);
-  const [artists, setArtists] = useState({});
+  const [participants, setParticipants] = useState({});
   const [roomBackground, setRoomBackgroundState] = useState('water');
   const [roomBackgroundExplicit, setRoomBackgroundExplicit] = useState(false);
   const [game, setGame] = useState(defaultGameState);
@@ -1168,7 +1165,7 @@ function useSharedRoom(roomId, client) {
 
     // Clear stale state from the previous room before loading the new one.
     setStrokes([]);
-    setArtists({});
+    setParticipants({});
     setRoomBackgroundState('water');
     setRoomBackgroundExplicit(false);
     setGame(defaultGameState());
@@ -1189,7 +1186,7 @@ function useSharedRoom(roomId, client) {
 
       const initial = transport.readState();
       if (initial?.payload?.strokes) setStrokes(initial.payload.strokes);
-      if (initial?.payload?.artists) setArtists(initial.payload.artists);
+      if (initial?.payload?.participants) setParticipants(initial.payload.participants);
 
       unsub = transport.subscribe((message) => {
         if (!message) return;
@@ -1207,7 +1204,7 @@ function useSharedRoom(roomId, client) {
         if (message.type === 'canvas:clear') setStrokes([]);
 
         if (message.type === 'presence:update' && message.clientId !== client.clientId) {
-          setArtists((prev) => ({
+          setParticipants((prev) => ({
             ...prev,
             [message.clientId]: { ...message.payload, lastSeen: Date.now() },
           }));
@@ -1215,8 +1212,8 @@ function useSharedRoom(roomId, client) {
 
         if (message.type === 'room:state' && message.payload) {
           if (Array.isArray(message.payload.strokes)) setStrokes(message.payload.strokes);
-          if (message.payload.artists && typeof message.payload.artists === 'object') {
-            setArtists(message.payload.artists);
+          if (message.payload.participants && typeof message.payload.participants === 'object') {
+            setParticipants(message.payload.participants);
           }
           if (message.payload.roomBackground !== undefined) {
             setRoomBackgroundState(normalizeRoomBackground(message.payload.roomBackground));
@@ -1260,10 +1257,10 @@ function useSharedRoom(roomId, client) {
     };
   }, [roomId, client.clientId]);
 
-  // Prune stale artists.
+  // Prune stale participants.
   useEffect(() => {
     const id = setInterval(() => {
-      setArtists((prev) => {
+      setParticipants((prev) => {
         const next = { ...prev };
         const now = Date.now();
         Object.keys(next).forEach((k) => { if (now - (next[k].lastSeen || 0) > 7000) delete next[k]; });
@@ -1275,8 +1272,8 @@ function useSharedRoom(roomId, client) {
 
   useEffect(() => {
     if (!transportRef.current || !roomId) return;
-    transportRef.current.writeState({ strokes, artists });
-  }, [roomId, strokes, artists]);
+    transportRef.current.writeState({ strokes, participants });
+  }, [roomId, strokes, participants]);
 
   const sendCanvasClear = useCallback(() => {
     setStrokes([]);
@@ -1285,7 +1282,7 @@ function useSharedRoom(roomId, client) {
 
   return useMemo(() => ({
     strokes,
-    artists,
+    participants,
     roomBackground,
     roomBackgroundExplicit,
     game,
@@ -1418,7 +1415,7 @@ function useSharedRoom(roomId, client) {
         payload: b,
       });
     },
-  }), [strokes, artists, roomBackground, roomBackgroundExplicit, game, client.clientId, sendCanvasClear]);
+  }), [strokes, participants, roomBackground, roomBackgroundExplicit, game, client.clientId, sendCanvasClear]);
 }
 
 
@@ -2717,8 +2714,8 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
   );
   const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
   const assignedTeam = useMemo(
-    () => computeAutoArtistTeam(clientId, shared.artists),
-    [clientId, shared.artists],
+    () => computeAutoArtistTeam(clientId, shared.participants),
+    [clientId, shared.participants],
   );
   const myTurnToDraw =
     inDrawRound &&
@@ -2777,7 +2774,7 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
                   <>
                     You&apos;re on <strong>Team {assignedTeam}</strong>
                   </>
-                ) : shared.artists?.[clientId] ? (
+                ) : shared.participants?.[clientId] ? (
                   <>
                     This room already has <strong>two players</strong> (one per team). Watch the Clocker screen — you
                     won&apos;t draw from this phone.
@@ -2917,7 +2914,7 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
   );
 }
 
-/** Shown when there is no room in the URL (typical phone open). Match artist splash; join only via QR link. */
+/** Shown when there is no room in the URL (typical phone open). Match participant splash; join only via QR link. */
 function JoinLandingView() {
   return (
     <div

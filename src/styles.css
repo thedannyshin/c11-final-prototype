@@ -326,7 +326,7 @@ p {
   color: #b1c941;
 }
 
-/* Triple “bam” scale on play HUD total when points go up (host + artist). */
+/* Triple “bam” scale on play HUD total when points go up (host + participant). */
 @keyframes play-score-total-bump {
   0% {
     transform: scale(1);
@@ -465,7 +465,7 @@ p {
   pointer-events: none;
 }
 
-/* Home / splash — bottom-left credits (Clocker + artist + join landing). */
+/* Home / splash — bottom-left credits (Clocker + participant + join landing). */
 .home-screen-credits {
   position: fixed;
   z-index: 112;
