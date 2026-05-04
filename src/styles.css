@@ -455,7 +455,7 @@ p {
   z-index: 112;
   left: max(14px, env(safe-area-inset-left));
   bottom: max(14px, env(safe-area-inset-bottom));
-  max-width: min(calc(100vw - 28px), 22rem);
+  max-width: min(calc(100vw - 28px), 36rem);
   margin: 0;
   padding: 0;
   display: flex;
@@ -466,7 +466,7 @@ p {
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1.35;
-  color: rgba(255, 255, 255, 0.52);
+  color: #fff;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
   pointer-events: none;
   user-select: none;
@@ -476,13 +476,14 @@ p {
   text-transform: uppercase;
   font-size: 0.68em;
   letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.38);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .home-screen-credits-list {
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+  white-space: nowrap;
 }
 
 .clocker-flow-inner--splash-card {
