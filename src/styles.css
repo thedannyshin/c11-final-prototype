@@ -378,7 +378,7 @@ p {
   text-align: right;
 }
 
-/* Sticker-style outline (ClockIt logo): stroke behind fill, no soft drop shadow */
+/* Sticker-style outline (ClockIt logo): thick stroke behind fill, no soft drop shadow */
 .clocker-play-active,
 .clocker-play-score-num,
 .clocker-play-timer,
@@ -386,7 +386,7 @@ p {
 .participant-play-score-num,
 .participant-play-timer {
   text-shadow: none;
-  -webkit-text-stroke: clamp(1.25px, 0.07em, 3.5px) #070c14;
+  -webkit-text-stroke: clamp(2.75px, 0.16em, 8px) #030508;
   paint-order: stroke fill;
 }
 
