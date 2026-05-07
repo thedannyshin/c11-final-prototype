@@ -19,7 +19,7 @@ const DEFAULT_COLOR = '#FFFFFF';
 const COLORS = ['#FFFFFF', '#00D4FF', '#F43F5E', '#10B981', '#FBBF24', '#A78BFA'];
 const SHOWCASE_WIDTH_FRAC = 0.3; // 70% main / 30% showcase
 
-const GAME_ROUND_MS = 2 * 60 * 1000;
+const GAME_ROUND_MS = 1 * 60 * 1000;
 /** If time is up but the Clocker never advanced phase (tab closed / lost), participant returns to join home after this wait. */
 const PARTICIPANT_STUCK_ROUND_GRACE_MS = 5000;
 const GAME_POINTS_DRAW_MULTI_COLOR = 10;
@@ -2481,6 +2481,8 @@ function ClockerView({ room, shared, onResetRoom }) {
           <ClockItLogo />
           <p className="clocker-flow-results-hero">Time&apos;s Up!</p>
           <p className="clocker-flow-results-score">Team 1 — {g.team1Score} pts</p>
+          <p className="clocker-flow-results-qr-label">Team 2 — scan to join</p>
+          <QRCodeSVG value={joinUrl} size={120} bgColor="transparent" fgColor="#ffffff" />
           <button type="button" className="clocker-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
             Continue to Team 2
           </button>

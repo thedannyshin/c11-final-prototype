@@ -810,6 +810,15 @@ p {
   color: rgba(255, 255, 255, 0.9);
 }
 
+.clocker-flow-results-qr-label {
+  margin: 8px 0 4px;
+  font-size: clamp(0.8rem, 2vw, 1rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .clocker-flow-continue {
   margin-top: 24px;
   padding: 14px 36px;
