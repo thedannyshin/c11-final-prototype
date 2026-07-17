@@ -94,6 +94,7 @@ function defaultGameState() {
   return {
     phase: 'splash',
     score: 0,
+    highScore: 0,
     roundEndAt: null,
     countdownStep: null,
   };
@@ -112,9 +113,11 @@ function normalizeGameState(raw) {
   const score = Number.isFinite(scoreFromNew) && scoreFromNew >= 0
     ? scoreFromNew
     : scoreFromLegacy;
+  const highScore = Math.max(0, Number(raw.highScore) || 0, score || 0);
   return {
     phase,
     score: Math.max(0, score || 0),
+    highScore,
     roundEndAt: raw.roundEndAt == null || raw.roundEndAt === '' ? null : Number(raw.roundEndAt),
     countdownStep,
   };
@@ -896,6 +899,7 @@ function createTransport(roomId) {
         runTransaction(gameRef, (curr) => {
           const g = normalizeGameState(curr);
           g.score = (g.score || 0) + (Number(delta) || 0);
+          if (g.score > (g.highScore || 0)) g.highScore = g.score;
           return g;
         });
       } else if (message.type === 'game:update') {
@@ -1321,14 +1325,16 @@ function useSharedRoom(roomId, client) {
         payload: { countdownStep: Math.min(4, Math.max(0, step)) },
       });
     },
-    /** Splash → countdown (score reset). Clears all drawings. */
+    /** Splash → countdown (score reset, high score kept). Clears all drawings. */
     gamePlayFromSplash() {
       sendCanvasClear();
+      const highScore = Math.max(0, gameRef.current.highScore || 0);
       transportRef.current?.send({
         type: 'game:set',
         payload: {
           phase: 'countdown',
           score: 0,
+          highScore,
           countdownStep: 0,
           roundEndAt: null,
         },
@@ -1350,23 +1356,26 @@ function useSharedRoom(roomId, client) {
       const g = gameRef.current;
       if (g.phase !== 'play') return;
       sendCanvasClear();
+      const highScore = Math.max(g.highScore || 0, g.score || 0);
       transportRef.current?.send({
         type: 'game:update',
-        payload: { phase: 'final', roundEndAt: null, countdownStep: null },
+        payload: { phase: 'final', roundEndAt: null, countdownStep: null, highScore },
       });
     },
     gameBackToSplash() {
       sendCanvasClear();
+      const highScore = Math.max(0, gameRef.current.highScore || 0, gameRef.current.score || 0);
       transportRef.current?.send({
         type: 'game:set',
-        payload: defaultGameState(),
+        payload: { ...defaultGameState(), highScore },
       });
     },
     gameResetMatch() {
       sendCanvasClear();
+      const highScore = Math.max(0, gameRef.current.highScore || 0, gameRef.current.score || 0);
       transportRef.current?.send({
         type: 'game:set',
-        payload: defaultGameState(),
+        payload: { ...defaultGameState(), highScore },
       });
     },
     setRoomBackground(bg) {
@@ -2410,7 +2419,29 @@ function ClockerView({ room, shared, onResetRoom }) {
                   disabled={!splashBgChosen}
                   title={splashBgChosen ? undefined : 'Pick a stage first'}
                   onClick={async () => {
-                    if (!handEnabled) setHandEnabled(true);
+                    // Ask for camera before fullscreen — Chrome exits FS on the permission prompt.
+                    if (!handEnabled) {
+                      try {
+                        const videoConstraints = cameraDeviceId
+                          ? {
+                              deviceId: { exact: cameraDeviceId },
+                              width: { ideal: 640 },
+                              height: { ideal: 480 },
+                            }
+                          : {
+                              width: { ideal: 640 },
+                              height: { ideal: 480 },
+                              facingMode: 'user',
+                            };
+                        const stream = await navigator.mediaDevices.getUserMedia({
+                          video: videoConstraints,
+                        });
+                        stream.getTracks().forEach((t) => t.stop());
+                      } catch (err) {
+                        console.warn('Camera:', err);
+                      }
+                      setHandEnabled(true);
+                    }
                     const root = clockerRootRef.current;
                     if (root && getBrowserFullscreenElement() !== root) {
                       try {
@@ -2470,7 +2501,9 @@ function ClockerView({ room, shared, onResetRoom }) {
       {showPlayHud ? (
         <div className="clocker-play-overlay" aria-live="polite">
           <div className="clocker-play-overlay-row">
-            <p className="clocker-play-active">Play</p>
+            <p className="clocker-play-active" title="Best score">
+              Best {g.highScore || 0}
+            </p>
             <div className="clocker-play-scores">
               <div className="clocker-play-score-block is-active">
                 <span
@@ -2745,7 +2778,9 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
         <>
           <div className="artist-play-hud">
             <div className="artist-play-hud-row">
-              <p className="artist-play-team">Play</p>
+              <p className="artist-play-team" title="Best score">
+                Best {gm.highScore || 0}
+              </p>
               <div className="artist-play-score-wrap">
                 <span
                   key={`artist-play-score-${playHudScoreBump}`}
