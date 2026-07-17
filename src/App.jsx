@@ -2409,8 +2409,16 @@ function ClockerView({ room, shared, onResetRoom }) {
                   className="clocker-flow-action-btn"
                   disabled={!splashBgChosen}
                   title={splashBgChosen ? undefined : 'Pick a stage first'}
-                  onClick={() => {
-                    setHandEnabled(true);
+                  onClick={async () => {
+                    if (!handEnabled) setHandEnabled(true);
+                    const root = clockerRootRef.current;
+                    if (root && getBrowserFullscreenElement() !== root) {
+                      try {
+                        await requestBrowserFullscreen(root);
+                      } catch (err) {
+                        console.warn('Fullscreen:', err);
+                      }
+                    }
                     shared.gamePlayFromSplash();
                   }}
                 >
