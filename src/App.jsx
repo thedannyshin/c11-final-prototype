@@ -2364,7 +2364,6 @@ function ClockerView({ room, shared, onResetRoom }) {
             <div className="clocker-flow-inner clocker-flow-inner--splash-card">
               <ClockItLogo />
               <div className="clocker-flow-splash-copy">
-                <p className="clocker-flow-splash-lead clocker-flow-splash-lead--head">1 round · draw &amp; score</p>
                 <p className="clocker-flow-splash-lead">Clocker → point to move, pinch to grab</p>
                 <p className="clocker-flow-splash-lead">Artist → scan the QR code below</p>
               </div>
