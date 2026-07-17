@@ -39,16 +39,20 @@ const ROOM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 /** Bump meta.touchedAt while any client is connected (server timestamps). */
 const ROOM_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
-const GAME_PHASES = [
-  'splash',
-  'countdown_team1',
-  'team1',
-  'results_team1',
-  'countdown_team2',
-  'team2',
-  'results_team2',
-  'final',
-];
+const GAME_PHASES = ['splash', 'countdown', 'play', 'final'];
+
+/** Map legacy two-team phases onto the single-round flow. */
+const LEGACY_PHASE_MAP = {
+  idle: 'splash',
+  between: 'splash',
+  done: 'final',
+  countdown_team1: 'countdown',
+  countdown_team2: 'countdown',
+  team1: 'play',
+  team2: 'play',
+  results_team1: 'final',
+  results_team2: 'final',
+};
 
 /** Big-screen role in the URL (?mode=clocker). Legacy ?mode=host is still accepted. */
 const CLOCKER_URL_MODE = 'clocker';
@@ -89,8 +93,7 @@ function readStoredVideoDeviceId() {
 function defaultGameState() {
   return {
     phase: 'splash',
-    team1Score: 0,
-    team2Score: 0,
+    score: 0,
     roundEndAt: null,
     countdownStep: null,
   };
@@ -99,16 +102,19 @@ function defaultGameState() {
 function normalizeGameState(raw) {
   if (!raw || typeof raw !== 'object') return defaultGameState();
   let phase = raw.phase;
-  const legacyMap = { idle: 'splash', between: 'splash', done: 'final' };
-  if (legacyMap[phase]) phase = legacyMap[phase];
+  if (LEGACY_PHASE_MAP[phase]) phase = LEGACY_PHASE_MAP[phase];
   if (!GAME_PHASES.includes(phase)) phase = 'splash';
   let countdownStep = raw.countdownStep;
   if (countdownStep === '' || Number.isNaN(Number(countdownStep))) countdownStep = null;
   else countdownStep = Math.min(4, Math.max(0, Number(countdownStep)));
+  const scoreFromNew = Number(raw.score);
+  const scoreFromLegacy = Math.max(0, Number(raw.team1Score) || 0) + Math.max(0, Number(raw.team2Score) || 0);
+  const score = Number.isFinite(scoreFromNew) && scoreFromNew >= 0
+    ? scoreFromNew
+    : scoreFromLegacy;
   return {
     phase,
-    team1Score: Math.max(0, Number(raw.team1Score) || 0),
-    team2Score: Math.max(0, Number(raw.team2Score) || 0),
+    score: Math.max(0, score || 0),
     roundEndAt: raw.roundEndAt == null || raw.roundEndAt === '' ? null : Number(raw.roundEndAt),
     countdownStep,
   };
@@ -117,18 +123,11 @@ function normalizeGameState(raw) {
 /** Big on-screen text during synced countdown (0 = Get Ready, 1–3 = numbers, 4 = Go). */
 function getCountdownDisplay(game) {
   const step = game.countdownStep == null ? 0 : game.countdownStep;
-  const teamLine =
-    game.phase === 'countdown_team1' ? 'Get ready — Team 1' : 'Get ready — Team 2';
-  if (step === 0) return { line1: teamLine, line2: null };
+  if (step === 0) return { line1: 'Get ready', line2: null };
   if (step === 1) return { line1: '3', line2: null };
   if (step === 2) return { line1: '2', line2: null };
   if (step === 3) return { line1: '1', line2: null };
   return { line1: 'Go!', line2: null };
-}
-
-function getWinnerPhrase(team1Score, team2Score) {
-  if (team1Score === team2Score) return "It's a tie!";
-  return team1Score > team2Score ? 'Team 1 wins!' : 'Team 2 wins!';
 }
 
 const CLOCKIT_LOGO_PATH = '/clockit-logo.png';
@@ -646,15 +645,13 @@ function getJoinUrl(room) {
   return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(room)}&mode=artist`;
 }
 
-/** Roster: sorted participant clientIds → first = Team 1, second = Team 2; max one phone per team (2 total). */
-function computeAutoArtistTeam(clientId, participants) {
+/** Roster: sorted artist clientIds — first two phones can draw in the round. */
+function canArtistDraw(clientId, participants) {
   const ids = Object.keys(participants || {})
     .filter((id) => (participants[id]?.role || '') === 'artist')
     .sort();
   const idx = ids.indexOf(clientId);
-  if (idx < 0) return null;
-  if (idx >= 2) return null;
-  return idx === 0 ? 1 : 2;
+  return idx >= 0 && idx < 2;
 }
 
 /** True for phone / tablet widths; wide screens default to Clocker, narrow to participant when URL does not specify. */
@@ -895,11 +892,10 @@ function createTransport(roomId) {
           ts: serverTimestamp(),
         });
       } else if (message.type === 'game:increment') {
-        const { team, delta } = message.payload;
+        const { delta } = message.payload;
         runTransaction(gameRef, (curr) => {
           const g = normalizeGameState(curr);
-          if (team === 1) g.team1Score = (g.team1Score || 0) + delta;
-          else if (team === 2) g.team2Score = (g.team2Score || 0) + delta;
+          g.score = (g.score || 0) + (Number(delta) || 0);
           return g;
         });
       } else if (message.type === 'game:update') {
@@ -1298,15 +1294,10 @@ function useSharedRoom(roomId, client) {
       });
       const g = gameRef.current;
       const delta = drawPointsForCharacter(character);
-      if (g.phase === 'team1') {
+      if (g.phase === 'play') {
         transportRef.current?.send({
           type: 'game:increment',
-          payload: { team: 1, delta },
-        });
-      } else if (g.phase === 'team2') {
-        transportRef.current?.send({
-          type: 'game:increment',
-          payload: { team: 2, delta },
+          payload: { delta },
         });
       }
       return delta;
@@ -1317,15 +1308,10 @@ function useSharedRoom(roomId, client) {
       const d = Number(delta);
       const safeDelta =
         Number.isFinite(d) && d > 0 ? Math.floor(d) : GAME_POINTS_MOVE;
-      if (g.phase === 'team1') {
+      if (g.phase === 'play') {
         transportRef.current?.send({
           type: 'game:increment',
-          payload: { team: 1, delta: safeDelta },
-        });
-      } else if (g.phase === 'team2') {
-        transportRef.current?.send({
-          type: 'game:increment',
-          payload: { team: 2, delta: safeDelta },
+          payload: { delta: safeDelta },
         });
       }
     },
@@ -1335,27 +1321,26 @@ function useSharedRoom(roomId, client) {
         payload: { countdownStep: Math.min(4, Math.max(0, step)) },
       });
     },
-    /** Splash → countdown Team 1 (scores reset). Clears all drawings. */
+    /** Splash → countdown (score reset). Clears all drawings. */
     gamePlayFromSplash() {
       sendCanvasClear();
       transportRef.current?.send({
         type: 'game:set',
         payload: {
-          phase: 'countdown_team1',
-          team1Score: 0,
-          team2Score: 0,
+          phase: 'countdown',
+          score: 0,
           countdownStep: 0,
           roundEndAt: null,
         },
       });
     },
-    /** After 3–2–1–Go — start the 2:00 round (canvas cleared). */
-    gameStartPlayRound(teamNum) {
+    /** After 3–2–1–Go — start the timed round (canvas cleared). */
+    gameStartPlayRound() {
       sendCanvasClear();
       transportRef.current?.send({
         type: 'game:update',
         payload: {
-          phase: teamNum === 1 ? 'team1' : 'team2',
+          phase: 'play',
           roundEndAt: Date.now() + GAME_ROUND_MS,
           countdownStep: null,
         },
@@ -1363,30 +1348,8 @@ function useSharedRoom(roomId, client) {
     },
     gameEndActiveRound() {
       const g = gameRef.current;
-      if (g.phase === 'team1') {
-        sendCanvasClear();
-        transportRef.current?.send({
-          type: 'game:update',
-          payload: { phase: 'results_team1', roundEndAt: null, countdownStep: null },
-        });
-      } else if (g.phase === 'team2') {
-        sendCanvasClear();
-        transportRef.current?.send({
-          type: 'game:update',
-          payload: { phase: 'results_team2', roundEndAt: null, countdownStep: null },
-        });
-      }
-    },
-    /** Results team 1 → countdown team 2. Clears drawings between teams. */
-    gameContinueToTeam2() {
+      if (g.phase !== 'play') return;
       sendCanvasClear();
-      transportRef.current?.send({
-        type: 'game:update',
-        payload: { phase: 'countdown_team2', countdownStep: 0, roundEndAt: null },
-      });
-    },
-    /** Results team 2 → final scoreboard. */
-    gameContinueToFinal() {
       transportRef.current?.send({
         type: 'game:update',
         payload: { phase: 'final', roundEndAt: null, countdownStep: null },
@@ -1985,10 +1948,10 @@ function HomeScreenCredits() {
   );
 }
 
-/** When the play-HUD total for the active round goes up, bump `nonce` so we can replay the hit animation. */
-function usePlayHudScoreBump(phase, team1Score, team2Score) {
-  const active = phase === 'team1' || phase === 'team2';
-  const displayed = phase === 'team1' ? team1Score : phase === 'team2' ? team2Score : null;
+/** When the play-HUD total goes up, bump `nonce` so we can replay the hit animation. */
+function usePlayHudScoreBump(phase, score) {
+  const active = phase === 'play';
+  const displayed = active ? score : null;
   const scoreBumpRef = useRef({ phase: null, score: null });
   const [bumpNonce, setBumpNonce] = useState(0);
   useEffect(() => {
@@ -2015,7 +1978,7 @@ function ClockerView({ room, shared, onResetRoom }) {
 
   const [, forceClockTick] = useState(0);
   useEffect(() => {
-    if (shared.game.phase !== 'team1' && shared.game.phase !== 'team2') return undefined;
+    if (shared.game.phase !== 'play') return undefined;
     if (!shared.game.roundEndAt) return undefined;
     const id = window.setInterval(() => forceClockTick((n) => n + 1), 250);
     return () => window.clearInterval(id);
@@ -2024,7 +1987,7 @@ function ClockerView({ room, shared, onResetRoom }) {
   useEffect(() => {
     const id = window.setInterval(() => {
       const { game } = sharedRef.current;
-      if (game.phase !== 'team1' && game.phase !== 'team2') return;
+      if (game.phase !== 'play') return;
       if (!game.roundEndAt || Date.now() < game.roundEndAt) return;
       sharedRef.current.gameEndActiveRound();
     }, 400);
@@ -2034,7 +1997,7 @@ function ClockerView({ room, shared, onResetRoom }) {
   const countdownRunIdRef = useRef(0);
   useEffect(() => {
     const p = shared.game.phase;
-    if (p !== 'countdown_team1' && p !== 'countdown_team2') return undefined;
+    if (p !== 'countdown') return undefined;
 
     const runId = ++countdownRunIdRef.current;
     const timers = [];
@@ -2049,11 +2012,7 @@ function ClockerView({ room, shared, onResetRoom }) {
     timers.push(window.setTimeout(() => safe(() => sharedRef.current.gameSetCountdownStep(4)), 4000));
     timers.push(
       window.setTimeout(
-        () =>
-          safe(() => {
-            const team = p === 'countdown_team1' ? 1 : 2;
-            sharedRef.current.gameStartPlayRound(team);
-          }),
+        () => safe(() => sharedRef.current.gameStartPlayRound()),
         5000,
       ),
     );
@@ -2380,12 +2339,11 @@ function ClockerView({ room, shared, onResetRoom }) {
 
   const g = shared.game;
   const cd = getCountdownDisplay(g);
-  const showPlayHud = g.phase === 'team1' || g.phase === 'team2';
+  const showPlayHud = g.phase === 'play';
   const pinchPlayHint = playHintLabels(displayScene);
   const { displayedScore: playHudScore, bumpNonce: playHudScoreBump } = usePlayHudScoreBump(
     g.phase,
-    g.team1Score,
-    g.team2Score,
+    g.score,
   );
 
   return (
@@ -2406,7 +2364,7 @@ function ClockerView({ room, shared, onResetRoom }) {
             <div className="clocker-flow-inner clocker-flow-inner--splash-card">
               <ClockItLogo />
               <div className="clocker-flow-splash-copy">
-                <p className="clocker-flow-splash-lead clocker-flow-splash-lead--head">2 teams · 2 players each</p>
+                <p className="clocker-flow-splash-lead clocker-flow-splash-lead--head">1 round · draw &amp; score</p>
                 <p className="clocker-flow-splash-lead">Clocker → point to move, pinch to grab</p>
                 <p className="clocker-flow-splash-lead">Artist → scan the QR code below</p>
               </div>
@@ -2466,7 +2424,7 @@ function ClockerView({ room, shared, onResetRoom }) {
         </>
       ) : null}
 
-      {(g.phase === 'countdown_team1' || g.phase === 'countdown_team2') ? (
+      {g.phase === 'countdown' ? (
         <div className="clocker-flow-overlay clocker-flow-overlay--countdown" aria-live="assertive">
           <div className="clocker-flow-countdown-display">
             <span key={`${g.phase}-${g.countdownStep ?? 0}`} className="clocker-flow-countdown-line">
@@ -2476,44 +2434,16 @@ function ClockerView({ room, shared, onResetRoom }) {
         </div>
       ) : null}
 
-      {g.phase === 'results_team1' ? (
-        <div className="clocker-flow-overlay clocker-flow-overlay--results">
-          <ClockItLogo />
-          <p className="clocker-flow-results-hero">Time&apos;s Up!</p>
-          <p className="clocker-flow-results-score">Team 1 — {g.team1Score} pts</p>
-          <p className="clocker-flow-results-qr-label">Team 2 — scan to join</p>
-          <QRCodeSVG value={joinUrl} size={120} bgColor="transparent" fgColor="#ffffff" />
-          <button type="button" className="clocker-flow-continue" onClick={() => shared.gameContinueToTeam2()}>
-            Continue to Team 2
-          </button>
-        </div>
-      ) : null}
-
-      {g.phase === 'results_team2' ? (
-        <div className="clocker-flow-overlay clocker-flow-overlay--results">
-          <ClockItLogo />
-          <p className="clocker-flow-results-hero">Time&apos;s Up!</p>
-          <p className="clocker-flow-results-score">Team 2 — {g.team2Score} pts</p>
-          <button type="button" className="clocker-flow-continue" onClick={() => shared.gameContinueToFinal()}>
-            See the Winner
-          </button>
-        </div>
-      ) : null}
-
       {g.phase === 'final' ? (
         <div className="clocker-flow-overlay clocker-flow-overlay--final">
           <ClockItLogo />
+          <p className="clocker-flow-results-hero">Time&apos;s Up!</p>
           <div className="clocker-flow-final-grid">
             <div className="clocker-flow-final-box">
-              <span className="clocker-flow-final-label">Team 1</span>
-              <span className="clocker-flow-final-num">{g.team1Score}</span>
-            </div>
-            <div className="clocker-flow-final-box">
-              <span className="clocker-flow-final-label">Team 2</span>
-              <span className="clocker-flow-final-num">{g.team2Score}</span>
+              <span className="clocker-flow-final-label">Score</span>
+              <span className="clocker-flow-final-num">{g.score}</span>
             </div>
           </div>
-          <p className="clocker-flow-final-winner">{getWinnerPhrase(g.team1Score, g.team2Score)}</p>
           <div className="clocker-flow-final-actions">
             <button type="button" className="clocker-flow-play" onClick={() => shared.gameBackToSplash()}>
               Play again
@@ -2533,9 +2463,7 @@ function ClockerView({ room, shared, onResetRoom }) {
       {showPlayHud ? (
         <div className="clocker-play-overlay" aria-live="polite">
           <div className="clocker-play-overlay-row">
-            <p className="clocker-play-active">
-              {g.phase === 'team1' ? 'Team 1' : 'Team 2'}
-            </p>
+            <p className="clocker-play-active">Play</p>
             <div className="clocker-play-scores">
               <div className="clocker-play-score-block is-active">
                 <span
@@ -2712,25 +2640,21 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
   const gm = shared.game;
   const { displayedScore: playHudScore, bumpNonce: playHudScoreBump } = usePlayHudScoreBump(
     gm.phase,
-    gm.team1Score,
-    gm.team2Score,
+    gm.score,
   );
-  const inDrawRound = gm.phase === 'team1' || gm.phase === 'team2';
-  const assignedTeam = useMemo(
-    () => computeAutoArtistTeam(clientId, shared.participants),
+  const inDrawRound = gm.phase === 'play';
+  const myTurnToDraw = useMemo(
+    () => inDrawRound && canArtistDraw(clientId, shared.participants),
+    [inDrawRound, clientId, shared.participants],
+  );
+  const isDrawer = useMemo(
+    () => canArtistDraw(clientId, shared.participants),
     [clientId, shared.participants],
   );
-  const myTurnToDraw =
-    inDrawRound &&
-    ((gm.phase === 'team1' && assignedTeam === 1) || (gm.phase === 'team2' && assignedTeam === 2));
-  const countdownActiveTeam =
-    gm.phase === 'countdown_team1' ? 1 : gm.phase === 'countdown_team2' ? 2 : null;
-  const artistCountsDown =
-    countdownActiveTeam != null && assignedTeam === countdownActiveTeam;
   const cdPhone = getCountdownDisplay(gm);
 
   useEffect(() => {
-    if (gm.phase !== 'team1' && gm.phase !== 'team2') return undefined;
+    if (gm.phase !== 'play') return undefined;
     if (!gm.roundEndAt) return undefined;
     const id = window.setInterval(() => forceClockTick((n) => n + 1), 250);
     return () => window.clearInterval(id);
@@ -2742,7 +2666,7 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
 
   useEffect(() => {
     if (typeof onExitToJoinHome !== 'function') return undefined;
-    if (gm.phase !== 'team1' && gm.phase !== 'team2') return undefined;
+    if (gm.phase !== 'play') return undefined;
     if (gm.roundEndAt == null) return undefined;
     const roundEndAt = gm.roundEndAt;
     const tick = () => {
@@ -2762,7 +2686,6 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
         inDrawRound && myTurnToDraw ? ' artist-shell--draw-pad' : ''
       }`}
       data-scene={scene}
-      data-my-team={assignedTeam == null ? 'none' : String(assignedTeam)}
       style={{ '--artist-shell-bg': `url('${bgUrl}')` }}
     >
       {gm.phase === 'splash' ? <ArtistSplashBackdrop active={!shared.roomBackgroundExplicit} /> : null}
@@ -2773,13 +2696,11 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
             <div className="artist-flow-inner artist-flow-inner--splash-card">
               <ClockItLogo variant="phone" />
               <p className="artist-assigned-team" role="status" aria-live="polite">
-                {assignedTeam === 1 || assignedTeam === 2 ? (
-                  <>
-                    You&apos;re on <strong>Team {assignedTeam}</strong>
-                  </>
+                {isDrawer ? (
+                  <>You&apos;re in — wait for the Clocker to start.</>
                 ) : shared.participants?.[clientId] ? (
                   <>
-                    This room already has <strong>two players</strong> (one per team). Watch the Clocker screen — you
+                    This room already has <strong>two artists</strong>. Watch the Clocker screen — you
                     won&apos;t draw from this phone.
                   </>
                 ) : (
@@ -2792,53 +2713,24 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
         </>
       ) : null}
 
-      {(gm.phase === 'countdown_team1' || gm.phase === 'countdown_team2') ? (
-        artistCountsDown ? (
-          <div className="artist-flow-overlay artist-flow-overlay--countdown" aria-live="assertive">
-            <span className="artist-flow-countdown-line" key={`${gm.phase}-${gm.countdownStep ?? 0}`}>
-              {cdPhone.line1}
-            </span>
-          </div>
-        ) : (
-          <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
-            <ClockItLogo variant="phone" />
-            <p className="artist-flow-results-title">
-              Team {countdownActiveTeam}&apos;s turn
-            </p>
-          </div>
-        )
-      ) : null}
-
-      {gm.phase === 'results_team1' ? (
-        <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
-          <ClockItLogo variant="phone" />
-          <p className="artist-flow-results-title">Time&apos;s up</p>
-          <p className="artist-flow-results-score">Team 1 — {gm.team1Score} pts</p>
-        </div>
-      ) : null}
-
-      {gm.phase === 'results_team2' ? (
-        <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
-          <ClockItLogo variant="phone" />
-          <p className="artist-flow-results-title">Time&apos;s up</p>
-          <p className="artist-flow-results-score">Team 2 — {gm.team2Score} pts</p>
+      {gm.phase === 'countdown' ? (
+        <div className="artist-flow-overlay artist-flow-overlay--countdown" aria-live="assertive">
+          <span className="artist-flow-countdown-line" key={`${gm.phase}-${gm.countdownStep ?? 0}`}>
+            {cdPhone.line1}
+          </span>
         </div>
       ) : null}
 
       {gm.phase === 'final' ? (
         <div className="artist-flow-overlay artist-flow-overlay--final">
           <ClockItLogo variant="phone" />
+          <p className="artist-flow-results-title">Time&apos;s up</p>
           <div className="artist-flow-final-grid">
             <div className="artist-flow-final-box">
-              <span>Team 1</span>
-              <strong>{gm.team1Score}</strong>
-            </div>
-            <div className="artist-flow-final-box">
-              <span>Team 2</span>
-              <strong>{gm.team2Score}</strong>
+              <span>Score</span>
+              <strong>{gm.score}</strong>
             </div>
           </div>
-          <p className="artist-flow-winner">{getWinnerPhrase(gm.team1Score, gm.team2Score)}</p>
         </div>
       ) : null}
 
@@ -2846,9 +2738,7 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
         <>
           <div className="artist-play-hud">
             <div className="artist-play-hud-row">
-              <p className="artist-play-team">
-                {gm.phase === 'team1' ? 'Team 1' : 'Team 2'}
-              </p>
+              <p className="artist-play-team">Play</p>
               <div className="artist-play-score-wrap">
                 <span
                   key={`artist-play-score-${playHudScoreBump}`}
@@ -2869,19 +2759,10 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
             </div>
           </div>
           {!myTurnToDraw ? (
-            assignedTeam === 1 || assignedTeam === 2 ? (
-              <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
-                <ClockItLogo variant="phone" />
-                <p className="artist-flow-results-title">
-                  Team {gm.phase === 'team1' ? 1 : 2}&apos;s turn
-                </p>
-              </div>
-            ) : (
-              <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
-                <ClockItLogo variant="phone" />
-                <p className="artist-flow-results-title">Room is full</p>
-              </div>
-            )
+            <div className="artist-flow-overlay artist-flow-overlay--results" aria-live="polite">
+              <ClockItLogo variant="phone" />
+              <p className="artist-flow-results-title">Room is full</p>
+            </div>
           ) : (
             <DrawingPad
               onCommit={(character) => {

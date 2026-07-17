@@ -198,7 +198,7 @@ p {
   color: rgba(255, 255, 255, 0.55);
 }
 
-/* During team1/team2: top bar + pinch hint for Clocker / mover */
+/* During play: top bar + pinch hint for Clocker / mover */
 .clocker-play-overlay {
   position: fixed;
   top: max(12px, env(safe-area-inset-top));
