@@ -33,9 +33,9 @@ function drawPointsForCharacter(character) {
 }
 /** Relocate to side panel but outside the illustrated “hot” zone (tank / grass patch). */
 const GAME_POINTS_MOVE_SIDE_OUTSIDE = 5;
-const PLAYER_NAME_MAX_LEN = 16;
-const LEADERBOARD_MAX = 10;
-const LEADERBOARD_PATH = 'leaderboard';
+const PLAYER_NAME_MAX_LEN = 32;
+const LEADERBOARD_MAX = 20;
+const LEADERBOARD_PATH = 'rooms/_clockit_leaderboard';
 
 /** Firebase RTDB rooms/{id} deleted if meta.touchedAt missing (legacy) or older than this. */
 const ROOM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -152,34 +152,34 @@ function getCountdownDisplay(game) {
   return { line1: 'Go!', line2: null };
 }
 
-function leaderboardEntryKey(name) {
-  const key = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-  return key || 'player';
+function leaderboardEntryFromRaw(entry, id) {
+  return {
+    id,
+    name: sanitizePlayerName(entry?.name),
+    score: Math.max(0, Math.floor(Number(entry?.score) || 0)),
+    at: Number(entry?.at) || 0,
+  };
 }
 
 function normalizeLeaderboardEntries(raw) {
   if (!raw) return [];
-  const list = Array.isArray(raw) ? raw : Object.values(raw);
+  const list = Array.isArray(raw)
+    ? raw.map((entry, i) => leaderboardEntryFromRaw(entry, entry?.id || `row_${i}`))
+    : Object.entries(raw).map(([id, entry]) => leaderboardEntryFromRaw(entry, id));
   return list
-    .map((entry) => ({
-      name: sanitizePlayerName(entry?.name),
-      score: Math.max(0, Math.floor(Number(entry?.score) || 0)),
-      at: Number(entry?.at) || 0,
-    }))
     .filter((entry) => entry.name)
     .sort((a, b) => b.score - a.score || b.at - a.at)
     .slice(0, LEADERBOARD_MAX);
 }
 
 function mergeLeaderboardScores(existing, incoming) {
-  const byName = new Map();
-  for (const entry of existing) byName.set(entry.name.toLowerCase(), entry);
+  const byId = new Map();
+  for (const entry of existing) byId.set(entry.id, entry);
   for (const entry of incoming) {
-    const key = entry.name.toLowerCase();
-    const prev = byName.get(key);
-    if (!prev || entry.score > prev.score) byName.set(key, entry);
+    const id = entry.id || `g_${entry.at}_${entry.score}`;
+    byId.set(id, { ...entry, id });
   }
-  return [...byName.values()]
+  return [...byId.values()]
     .sort((a, b) => b.score - a.score || b.at - a.at)
     .slice(0, LEADERBOARD_MAX);
 }
@@ -187,8 +187,7 @@ function mergeLeaderboardScores(existing, incoming) {
 function leaderboardToFirebase(entries) {
   const out = {};
   entries.forEach((entry, i) => {
-    let key = leaderboardEntryKey(entry.name);
-    if (out[key]) key = `${key}_${i}`;
+    const key = entry.id || `g_${entry.at}_${i}`;
     out[key] = { name: entry.name, score: entry.score, at: entry.at };
   });
   return out;
@@ -197,7 +196,13 @@ function leaderboardToFirebase(entries) {
 function recordLeaderboardGame(game) {
   const name = sanitizePlayerName(game.playerName);
   if (!name) return;
-  const incoming = [{ name, score: Math.max(0, game.score || 0), at: Date.now() }];
+  const at = Date.now();
+  const incoming = [{
+    id: `g_${at}`,
+    name,
+    score: Math.max(0, game.score || 0),
+    at,
+  }];
   const db = getDatabase(firebaseApp);
   runTransaction(dbRef(db, LEADERBOARD_PATH), (curr) =>
     leaderboardToFirebase(mergeLeaderboardScores(normalizeLeaderboardEntries(curr), incoming)),
@@ -874,6 +879,7 @@ function coerceFirebaseMillis(ts) {
 }
 
 async function pruneExpiredRoom(db, roomId) {
+  if (roomId === '_clockit_leaderboard') return;
   const roomRoot = dbRef(db, `rooms/${roomId}`);
   const metaRef = dbRef(db, `rooms/${roomId}/meta`);
 
@@ -2067,7 +2073,7 @@ function ClockItLeaderboard({ entries }) {
       ) : (
         <ol className="clocker-leaderboard-list">
           {entries.map((entry, i) => (
-            <li key={`${entry.name}-${entry.at}`} className="clocker-leaderboard-row">
+            <li key={entry.id || `${entry.name}-${entry.at}-${entry.score}`} className="clocker-leaderboard-row">
               <span className="clocker-leaderboard-rank">{i + 1}</span>
               <span className="clocker-leaderboard-name">{entry.name}</span>
               <span className="clocker-leaderboard-score">{entry.score}</span>
@@ -2505,9 +2511,7 @@ function ClockerView({ room, shared, onResetRoom }) {
             className="clocker-flow-overlay clocker-flow-overlay--splash"
             aria-label="ClockIt — roles and QR for artists"
           >
-            <div className="clocker-flow-splash-stage">
-              <ClockItLeaderboard entries={leaderboardEntries} />
-              <div className="clocker-flow-inner clocker-flow-inner--splash-card">
+            <div className="clocker-flow-inner clocker-flow-inner--splash-card">
               <ClockItLogo />
               <div className="clocker-flow-splash-copy">
                 <p className="clocker-flow-splash-lead">Clocker → point to move, pinch to grab</p>
@@ -2621,8 +2625,8 @@ function ClockerView({ room, shared, onResetRoom }) {
                   Play
                 </button>
               </div>
-              </div>
             </div>
+            <ClockItLeaderboard entries={leaderboardEntries} />
           </div>
           <HomeScreenCredits />
         </>

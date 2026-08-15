@@ -470,21 +470,16 @@ p {
   padding: 20px 20px 96px;
 }
 
-.clocker-flow-splash-stage {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: stretch;
-  gap: 18px;
-  width: 100%;
-  max-width: min(96vw, 52rem);
-}
-
 .clocker-leaderboard {
   pointer-events: auto;
-  flex: 0 1 18.5rem;
-  width: min(100%, 18.5rem);
-  max-width: 20rem;
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  width: min(20rem, calc(100vw - 40px));
+  max-height: calc(100vh - 140px);
+  overflow: auto;
   padding: 22px 18px 18px;
   border-radius: 24px;
   background: rgba(5, 14, 28, 0.82);
@@ -671,7 +666,6 @@ p {
 
 .clocker-flow-inner--splash-card.clocker-flow-inner {
   gap: 16px;
-  flex: 1 1 22rem;
 }
 
 .clocker-flow-inner {
