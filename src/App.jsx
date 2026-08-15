@@ -33,6 +33,9 @@ function drawPointsForCharacter(character) {
 }
 /** Relocate to side panel but outside the illustrated “hot” zone (tank / grass patch). */
 const GAME_POINTS_MOVE_SIDE_OUTSIDE = 5;
+const PLAYER_NAME_MAX_LEN = 16;
+const LEADERBOARD_MAX = 10;
+const LEADERBOARD_PATH = 'leaderboard';
 
 /** Firebase RTDB rooms/{id} deleted if meta.touchedAt missing (legacy) or older than this. */
 const ROOM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -90,6 +93,19 @@ function readStoredVideoDeviceId() {
   }
 }
 
+function clampPlayerName(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/[\r\n\t]/g, '').slice(0, PLAYER_NAME_MAX_LEN);
+}
+
+function sanitizePlayerName(raw) {
+  return clampPlayerName(raw).replace(/\s+/g, ' ').trim();
+}
+
+function playerLabel(game) {
+  return sanitizePlayerName(game?.playerName);
+}
+
 function defaultGameState() {
   return {
     phase: 'splash',
@@ -97,6 +113,7 @@ function defaultGameState() {
     highScore: 0,
     roundEndAt: null,
     countdownStep: null,
+    playerName: '',
   };
 }
 
@@ -120,17 +137,71 @@ function normalizeGameState(raw) {
     highScore,
     roundEndAt: raw.roundEndAt == null || raw.roundEndAt === '' ? null : Number(raw.roundEndAt),
     countdownStep,
+    playerName: clampPlayerName(raw.playerName),
   };
 }
 
 /** Big on-screen text during synced countdown (0 = Get Ready, 1–3 = numbers, 4 = Go). */
 function getCountdownDisplay(game) {
   const step = game.countdownStep == null ? 0 : game.countdownStep;
-  if (step === 0) return { line1: 'Get ready', line2: null };
+  const name = playerLabel(game);
+  if (step === 0) return { line1: name ? `Get ready — ${name}` : 'Get ready', line2: null };
   if (step === 1) return { line1: '3', line2: null };
   if (step === 2) return { line1: '2', line2: null };
   if (step === 3) return { line1: '1', line2: null };
   return { line1: 'Go!', line2: null };
+}
+
+function leaderboardEntryKey(name) {
+  const key = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  return key || 'player';
+}
+
+function normalizeLeaderboardEntries(raw) {
+  if (!raw) return [];
+  const list = Array.isArray(raw) ? raw : Object.values(raw);
+  return list
+    .map((entry) => ({
+      name: sanitizePlayerName(entry?.name),
+      score: Math.max(0, Math.floor(Number(entry?.score) || 0)),
+      at: Number(entry?.at) || 0,
+    }))
+    .filter((entry) => entry.name)
+    .sort((a, b) => b.score - a.score || b.at - a.at)
+    .slice(0, LEADERBOARD_MAX);
+}
+
+function mergeLeaderboardScores(existing, incoming) {
+  const byName = new Map();
+  for (const entry of existing) byName.set(entry.name.toLowerCase(), entry);
+  for (const entry of incoming) {
+    const key = entry.name.toLowerCase();
+    const prev = byName.get(key);
+    if (!prev || entry.score > prev.score) byName.set(key, entry);
+  }
+  return [...byName.values()]
+    .sort((a, b) => b.score - a.score || b.at - a.at)
+    .slice(0, LEADERBOARD_MAX);
+}
+
+function leaderboardToFirebase(entries) {
+  const out = {};
+  entries.forEach((entry, i) => {
+    let key = leaderboardEntryKey(entry.name);
+    if (out[key]) key = `${key}_${i}`;
+    out[key] = { name: entry.name, score: entry.score, at: entry.at };
+  });
+  return out;
+}
+
+function recordLeaderboardGame(game) {
+  const name = sanitizePlayerName(game.playerName);
+  if (!name) return;
+  const incoming = [{ name, score: Math.max(0, game.score || 0), at: Date.now() }];
+  const db = getDatabase(firebaseApp);
+  runTransaction(dbRef(db, LEADERBOARD_PATH), (curr) =>
+    leaderboardToFirebase(mergeLeaderboardScores(normalizeLeaderboardEntries(curr), incoming)),
+  ).catch((err) => console.warn('Leaderboard write:', err?.message || err));
 }
 
 const CLOCKIT_LOGO_PATH = '/clockit-logo.png';
@@ -1325,8 +1396,14 @@ function useSharedRoom(roomId, client) {
         payload: { countdownStep: Math.min(4, Math.max(0, step)) },
       });
     },
+    gameSetPlayerName(playerName) {
+      transportRef.current?.send({
+        type: 'game:update',
+        payload: { playerName: clampPlayerName(playerName) },
+      });
+    },
     /** Splash → countdown (score reset, high score kept). Clears all drawings. */
-    gamePlayFromSplash() {
+    gamePlayFromSplash(playerName) {
       sendCanvasClear();
       const highScore = Math.max(0, gameRef.current.highScore || 0);
       transportRef.current?.send({
@@ -1337,6 +1414,7 @@ function useSharedRoom(roomId, client) {
           highScore,
           countdownStep: 0,
           roundEndAt: null,
+          playerName: sanitizePlayerName(playerName),
         },
       });
     },
@@ -1357,6 +1435,7 @@ function useSharedRoom(roomId, client) {
       if (g.phase !== 'play') return;
       sendCanvasClear();
       const highScore = Math.max(g.highScore || 0, g.score || 0);
+      recordLeaderboardGame({ ...g, highScore });
       transportRef.current?.send({
         type: 'game:update',
         payload: { phase: 'final', roundEndAt: null, countdownStep: null, highScore },
@@ -1364,18 +1443,28 @@ function useSharedRoom(roomId, client) {
     },
     gameBackToSplash() {
       sendCanvasClear();
-      const highScore = Math.max(0, gameRef.current.highScore || 0, gameRef.current.score || 0);
+      const g = gameRef.current;
+      const highScore = Math.max(0, g.highScore || 0, g.score || 0);
       transportRef.current?.send({
         type: 'game:set',
-        payload: { ...defaultGameState(), highScore },
+        payload: {
+          ...defaultGameState(),
+          highScore,
+          playerName: clampPlayerName(g.playerName),
+        },
       });
     },
     gameResetMatch() {
       sendCanvasClear();
-      const highScore = Math.max(0, gameRef.current.highScore || 0, gameRef.current.score || 0);
+      const g = gameRef.current;
+      const highScore = Math.max(0, g.highScore || 0, g.score || 0);
       transportRef.current?.send({
         type: 'game:set',
-        payload: { ...defaultGameState(), highScore },
+        payload: {
+          ...defaultGameState(),
+          highScore,
+          playerName: clampPlayerName(g.playerName),
+        },
       });
     },
     setRoomBackground(bg) {
@@ -1957,6 +2046,39 @@ function HomeScreenCredits() {
   );
 }
 
+function useLeaderboard() {
+  const [entries, setEntries] = useState([]);
+  useEffect(() => {
+    const db = getDatabase(firebaseApp);
+    const unsub = onValue(dbRef(db, LEADERBOARD_PATH), (snapshot) => {
+      setEntries(normalizeLeaderboardEntries(snapshot.val()));
+    });
+    return () => unsub();
+  }, []);
+  return entries;
+}
+
+function ClockItLeaderboard({ entries }) {
+  return (
+    <aside className="clocker-leaderboard" aria-label="Leaderboard">
+      <h2 className="clocker-leaderboard-title">Leaderboard</h2>
+      {entries.length === 0 ? (
+        <p className="clocker-leaderboard-empty">Play a game to set a score</p>
+      ) : (
+        <ol className="clocker-leaderboard-list">
+          {entries.map((entry, i) => (
+            <li key={`${entry.name}-${entry.at}`} className="clocker-leaderboard-row">
+              <span className="clocker-leaderboard-rank">{i + 1}</span>
+              <span className="clocker-leaderboard-name">{entry.name}</span>
+              <span className="clocker-leaderboard-score">{entry.score}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </aside>
+  );
+}
+
 /** When the play-HUD total goes up, bump `nonce` so we can replay the hit animation. */
 function usePlayHudScoreBump(phase, score) {
   const active = phase === 'play';
@@ -2044,6 +2166,9 @@ function ClockerView({ room, shared, onResetRoom }) {
   const [clockerFullscreen, setClockerFullscreen] = useState(false);
   const [hudIdleHidden, setHudIdleHidden] = useState(false);
   const [splashBgChosen, setSplashBgChosen] = useState(false);
+  const [playerNameDraft, setPlayerNameDraft] = useState(() => clampPlayerName(shared.game.playerName));
+  const nameHydratedRef = useRef(!!sanitizePlayerName(shared.game.playerName));
+  const leaderboardEntries = useLeaderboard();
   /** While on splash with no background yet: play each scene’s music file to completion, then the next */
   const [splashPreSelectMusicIdx, setSplashPreSelectMusicIdx] = useState(0);
   const [relocatePointsPop, setRelocatePointsPop] = useState(0);
@@ -2346,7 +2471,17 @@ function ClockerView({ room, shared, onResetRoom }) {
 
   const visibleStrokes = shared.strokes.filter((s) => !hiddenIds.has(s.id));
 
+  useEffect(() => {
+    if (nameHydratedRef.current) return;
+    const name = shared.game.playerName;
+    if (!name) return;
+    nameHydratedRef.current = true;
+    setPlayerNameDraft((prev) => prev || name);
+  }, [shared.game.playerName]);
+
   const g = shared.game;
+  const nameReady = !!sanitizePlayerName(playerNameDraft);
+  const canStartPlay = splashBgChosen && nameReady;
   const cd = getCountdownDisplay(g);
   const showPlayHud = g.phase === 'play';
   const pinchPlayHint = playHintLabels(displayScene);
@@ -2370,11 +2505,31 @@ function ClockerView({ room, shared, onResetRoom }) {
             className="clocker-flow-overlay clocker-flow-overlay--splash"
             aria-label="ClockIt — roles and QR for artists"
           >
-            <div className="clocker-flow-inner clocker-flow-inner--splash-card">
+            <div className="clocker-flow-splash-stage">
+              <ClockItLeaderboard entries={leaderboardEntries} />
+              <div className="clocker-flow-inner clocker-flow-inner--splash-card">
               <ClockItLogo />
               <div className="clocker-flow-splash-copy">
                 <p className="clocker-flow-splash-lead">Clocker → point to move, pinch to grab</p>
                 <p className="clocker-flow-splash-lead">Artist → scan the QR code below</p>
+              </div>
+              <div className="clocker-flow-names">
+                <label className="clocker-flow-name-field">
+                  <span>Your name</span>
+                  <input
+                    type="text"
+                    name="playerName"
+                    autoComplete="off"
+                    maxLength={PLAYER_NAME_MAX_LEN}
+                    placeholder="Name"
+                    value={playerNameDraft}
+                    onChange={(e) => setPlayerNameDraft(clampPlayerName(e.target.value))}
+                    onBlur={(e) => shared.gameSetPlayerName(e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.currentTarget.blur();
+                    }}
+                  />
+                </label>
               </div>
               <QRCodeSVG value={joinUrl} size={140} bgColor="transparent" fgColor="#ffffff" />
               <div className="clocker-flow-scene">
@@ -2416,9 +2571,19 @@ function ClockerView({ room, shared, onResetRoom }) {
                 <button
                   type="button"
                   className="clocker-flow-action-btn"
-                  disabled={!splashBgChosen}
-                  title={splashBgChosen ? undefined : 'Pick a stage first'}
+                  disabled={!canStartPlay}
+                  title={
+                    !nameReady
+                      ? 'Enter your name first'
+                      : !splashBgChosen
+                        ? 'Pick a stage first'
+                        : undefined
+                  }
                   onClick={async () => {
+                    const name = sanitizePlayerName(playerNameDraft);
+                    if (!name || !splashBgChosen) return;
+                    setPlayerNameDraft(name);
+                    shared.gameSetPlayerName(name);
                     // Ask for camera before fullscreen — Chrome exits FS on the permission prompt.
                     if (!handEnabled) {
                       try {
@@ -2450,11 +2615,12 @@ function ClockerView({ room, shared, onResetRoom }) {
                         console.warn('Fullscreen:', err);
                       }
                     }
-                    shared.gamePlayFromSplash();
+                    shared.gamePlayFromSplash(name);
                   }}
                 >
                   Play
                 </button>
+              </div>
               </div>
             </div>
           </div>
@@ -2478,7 +2644,7 @@ function ClockerView({ room, shared, onResetRoom }) {
           <p className="clocker-flow-results-hero">Time&apos;s Up!</p>
           <div className="clocker-flow-final-grid">
             <div className="clocker-flow-final-box">
-              <span className="clocker-flow-final-label">Score</span>
+              <span className="clocker-flow-final-label">{playerLabel(g) || 'Score'}</span>
               <span className="clocker-flow-final-num">{g.score}</span>
             </div>
           </div>
@@ -2501,8 +2667,8 @@ function ClockerView({ room, shared, onResetRoom }) {
       {showPlayHud ? (
         <div className="clocker-play-overlay" aria-live="polite">
           <div className="clocker-play-overlay-row">
-            <p className="clocker-play-active" title="Best score">
-              Best {g.highScore || 0}
+            <p className="clocker-play-active">
+              {playerLabel(g) || 'Score'}
             </p>
             <div className="clocker-play-scores">
               <div className="clocker-play-score-block is-active">
@@ -2767,7 +2933,7 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
           <p className="artist-flow-results-title">Time&apos;s up</p>
           <div className="artist-flow-final-grid">
             <div className="artist-flow-final-box">
-              <span>Score</span>
+              <span>{playerLabel(gm) || 'Score'}</span>
               <strong>{gm.score}</strong>
             </div>
           </div>
@@ -2778,8 +2944,8 @@ function ArtistView({ shared, clientName, setClientName, clientColor, clientId, 
         <>
           <div className="artist-play-hud">
             <div className="artist-play-hud-row">
-              <p className="artist-play-team" title="Best score">
-                Best {gm.highScore || 0}
+              <p className="artist-play-team">
+                {playerLabel(gm) || 'Score'}
               </p>
               <div className="artist-play-score-wrap">
                 <span

@@ -374,6 +374,8 @@ p {
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.96);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .clocker-play-scores {
@@ -463,6 +465,147 @@ p {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   pointer-events: none;
+  overflow: auto;
+  align-items: center;
+  padding: 20px 20px 96px;
+}
+
+.clocker-flow-splash-stage {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 18px;
+  width: 100%;
+  max-width: min(96vw, 52rem);
+}
+
+.clocker-leaderboard {
+  pointer-events: auto;
+  flex: 0 1 18.5rem;
+  width: min(100%, 18.5rem);
+  max-width: 20rem;
+  padding: 22px 18px 18px;
+  border-radius: 24px;
+  background: rgba(5, 14, 28, 0.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  text-align: left;
+}
+
+.clocker-leaderboard-title {
+  margin: 0 0 12px;
+  font-size: clamp(0.78rem, 2.2vw, 0.88rem);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+  text-align: center;
+}
+
+.clocker-leaderboard-empty {
+  margin: 8px 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+}
+
+.clocker-leaderboard-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.clocker-leaderboard-row {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 7px 6px;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.clocker-leaderboard-rank {
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.clocker-leaderboard-row:nth-child(1) .clocker-leaderboard-rank {
+  color: #fbbf24;
+}
+
+.clocker-leaderboard-row:nth-child(2) .clocker-leaderboard-rank {
+  color: #d1d5db;
+}
+
+.clocker-leaderboard-row:nth-child(3) .clocker-leaderboard-rank {
+  color: #d97706;
+}
+
+.clocker-leaderboard-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clocker-leaderboard-score {
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.clocker-flow-names {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
+.clocker-flow-name-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  text-align: left;
+}
+
+.clocker-flow-name-field span {
+  font-size: clamp(0.72rem, 2vw, 0.8rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.clocker-flow-name-field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  outline: none;
+}
+
+.clocker-flow-name-field input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.clocker-flow-name-field input:focus {
+  border-color: rgba(0, 212, 255, 0.65);
 }
 
 /* Home / splash — bottom-left credits (Clocker + participant + join landing). */
@@ -524,6 +667,11 @@ p {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.clocker-flow-inner--splash-card.clocker-flow-inner {
+  gap: 16px;
+  flex: 1 1 22rem;
 }
 
 .clocker-flow-inner {
@@ -1477,6 +1625,8 @@ p {
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.96);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .artist-play-score-wrap {
